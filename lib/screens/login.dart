@@ -31,6 +31,7 @@ class LoginScreen extends StatelessWidget {
                 style: GoogleFonts.prompt(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
               ),
               SizedBox(
