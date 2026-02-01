@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:laundry_app/models/machine.dart';
 import 'package:laundry_app/screens/setting.dart';
 import 'package:laundry_app/models/theme.dart';
+import 'package:laundry_app/screens/machineInfo.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -69,50 +70,68 @@ class _HomeContent extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(0, 20, 0, 0),
           itemCount: machines.length,
           itemBuilder: (context, index) {
-            return Container(
-              decoration: BoxDecoration(
-                color: AppTheme.secondary,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              padding: EdgeInsets.all(20),
-              margin: EdgeInsets.all(5),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        machines[index].name,
-                        style: GoogleFonts.prompt(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        'ราคา ${machines[index].price.toString()} บาท',
-                        style: GoogleFonts.prompt(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
+            return GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const MachineInfoScreen(),
                   ),
-                  Text(
-                    machines[index].isAvailable.toString() == 'true'
-                        ? 'ว่าง'
-                        : 'ไม่ว่าง',
-                    style: GoogleFonts.prompt(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: machines[index].isAvailable == true
-                          ? const Color.fromARGB(255, 65, 160, 68)
-                          : Colors.red,
+                );
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.secondary,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: EdgeInsets.all(20),
+                margin: EdgeInsets.fromLTRB(10, 5, 10, 5),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          machines[index].name,
+                          style: GoogleFonts.prompt(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          'ราคา ${machines[index].price.toString()} บาท',
+                          style: GoogleFonts.prompt(
+                            fontSize: 15,
+                            // fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          'น้ำหนัก ${machines[index].weight.toString()} กิโลกรัม',
+                          style: GoogleFonts.prompt(
+                            fontSize: 15,
+                            // fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                    Text(
+                      machines[index].isAvailable.toString() == 'true'
+                          ? 'ว่าง'
+                          : 'ไม่ว่าง',
+                      style: GoogleFonts.prompt(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: machines[index].isAvailable == true
+                            ? const Color.fromARGB(255, 65, 160, 68)
+                            : Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           },

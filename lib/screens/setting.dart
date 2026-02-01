@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:laundry_app/models/settinglist.dart';
 import 'package:laundry_app/models/theme.dart';
 import 'package:laundry_app/screens/login.dart';
+import 'package:laundry_app/screens/profile.dart';
+import 'package:laundry_app/screens/about.dart';
 
 class SettingScreen extends StatelessWidget {
   const SettingScreen({super.key});
@@ -57,34 +59,53 @@ class SettingScreen extends StatelessWidget {
                 ),
               );
             }
-            return Container(
-              decoration: BoxDecoration(
-                color: AppTheme.secondary,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              padding: EdgeInsets.all(15),
-              margin: EdgeInsets.all(10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        settingList[index].title,
-                        style: GoogleFonts.prompt(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+            return GestureDetector(
+              onTap: () {
+                if (settingList[index].title == 'บัญชีของฉัน') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ProfileScreen(),
+                    ),
+                  );
+                } else if (settingList[index].title == 'เกี่ยวกับ') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AboutScreen(),
+                    ),
+                  );
+                }
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.secondary,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: EdgeInsets.all(15),
+                margin: EdgeInsets.all(10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          settingList[index].title,
+                          style: GoogleFonts.prompt(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  Icon(
-                    settingList[index].icon,
-                    color: Colors.white,
-                  ),
-                ],
+                      ],
+                    ),
+                    Icon(
+                      settingList[index].icon,
+                      color: Colors.white,
+                    ),
+                  ],
+                ),
               ),
             );
           },

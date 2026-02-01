@@ -22,7 +22,7 @@ class LoginScreen extends StatelessWidget {
       body: Center(
         child: Container(
           color: AppTheme.background,
-          padding: EdgeInsets.all(20),
+          padding: EdgeInsets.all(25),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -44,7 +44,7 @@ class LoginScreen extends StatelessWidget {
                     'ชื่อผู้ใช้',
                     style: GoogleFonts.prompt(
                       fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                      // fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
@@ -59,7 +59,7 @@ class LoginScreen extends StatelessWidget {
                     'รหัสผ่าน',
                     style: GoogleFonts.prompt(
                       fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                      // fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),

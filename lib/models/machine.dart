@@ -11,6 +11,7 @@ class Machine {
   final MachineType type;
   final double price;
   final bool isAvailable;
+  final double weight;
 
   Machine({
     required this.id,
@@ -18,6 +19,7 @@ class Machine {
     required this.type,
     required this.price,
     required this.isAvailable,
+    required this.weight,
   });
 }
 
@@ -28,6 +30,7 @@ List<Machine> machines = [
     type: MachineType.washer,
     price: 20,
     isAvailable: true,
+    weight: 10,
   ),
   Machine(
     id: 2,
@@ -35,19 +38,22 @@ List<Machine> machines = [
     type: MachineType.dryer,
     price: 20,
     isAvailable: true,
+    weight: 10,
   ),
   Machine(
     id: 3,
     name: 'เครื่องซักผ้า 2',
     type: MachineType.washer,
-    price: 20,
+    price: 50,
     isAvailable: false,
+    weight: 20,
   ),
   Machine(
     id: 4,
     name: 'เครื่องอบผ้า 2',
     type: MachineType.dryer,
-    price: 20,
+    price: 50,
     isAvailable: true,
+    weight: 20,
   ),
 ];
