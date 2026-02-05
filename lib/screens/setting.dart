@@ -5,6 +5,7 @@ import 'package:laundry_app/models/theme.dart';
 import 'package:laundry_app/screens/login.dart';
 import 'package:laundry_app/screens/profile.dart';
 import 'package:laundry_app/screens/about.dart';
+import 'package:laundry_app/screens/my_bookings.dart';
 
 class SettingScreen extends StatelessWidget {
   const SettingScreen({super.key});
@@ -66,6 +67,13 @@ class SettingScreen extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (context) => const ProfileScreen(),
+                    ),
+                  );
+                } else if (settingList[index].title == 'การจองของฉัน') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const MyBookingsScreen(),
                     ),
                   );
                 } else if (settingList[index].title == 'เกี่ยวกับ') {
