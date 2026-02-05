@@ -1,59 +1,43 @@
-import 'package:flutter/material.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'machine.freezed.dart';
+part 'machine.g.dart';
 
 enum MachineType {
+  @JsonValue('washer')
   washer,
+  @JsonValue('dryer')
   dryer,
 }
 
-class Machine {
-  final int id;
-  final String name;
-  final MachineType type;
-  final double price;
-  final bool isAvailable;
-  final double weight;
-
-  Machine({
-    required this.id,
-    required this.name,
-    required this.type,
-    required this.price,
-    required this.isAvailable,
-    required this.weight,
-  });
+enum MachineStatus {
+  @JsonValue('available')
+  available,
+  @JsonValue('in_use')
+  inUse,
+  @JsonValue('reserved')
+  reserved,
+  @JsonValue('maintenance')
+  maintenance,
+  @JsonValue('overdue')
+  overdue,
 }
 
-List<Machine> machines = [
-  Machine(
-    id: 1,
-    name: 'เครื่องซักผ้า 1',
-    type: MachineType.washer,
-    price: 20,
-    isAvailable: true,
-    weight: 10,
-  ),
-  Machine(
-    id: 2,
-    name: 'เครื่องอบผ้า 1',
-    type: MachineType.dryer,
-    price: 20,
-    isAvailable: true,
-    weight: 10,
-  ),
-  Machine(
-    id: 3,
-    name: 'เครื่องซักผ้า 2',
-    type: MachineType.washer,
-    price: 50,
-    isAvailable: false,
-    weight: 20,
-  ),
-  Machine(
-    id: 4,
-    name: 'เครื่องอบผ้า 2',
-    type: MachineType.dryer,
-    price: 50,
-    isAvailable: true,
-    weight: 20,
-  ),
-];
+@freezed
+class Machine with _$Machine {
+  const factory Machine({
+    required String id,
+    @JsonKey(name: 'dormitory_id') required String dormitoryId,
+    @JsonKey(name: 'machine_number') required String machineNumber,
+    @JsonKey(name: 'machine_type') required MachineType machineType,
+    @Default(0) int capacity,
+    @Default(MachineStatus.available) MachineStatus status,
+    int? floor,
+    @JsonKey(name: 'location_detail') String? locationDetail,
+    @JsonKey(name: 'qr_code') String? qrCode,
+    @JsonKey(name: 'is_active') @Default(true) bool isActive,
+  }) = _Machine;
+
+  factory Machine.fromJson(Map<String, dynamic> json) =>
+      _$MachineFromJson(json);
+}
