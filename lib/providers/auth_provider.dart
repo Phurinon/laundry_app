@@ -27,6 +27,8 @@ class AuthProvider extends Notifier<AsyncValue<Session?>> {
         email: email,
         password: password,
       );
+    } on AuthException catch (e) {
+      state = AsyncValue.error(e.message, StackTrace.current);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }
@@ -40,7 +42,7 @@ class AuthProvider extends Notifier<AsyncValue<Session?>> {
   ) async {
     state = const AsyncValue.loading();
     try {
-      await _supabase.auth.signUp(
+      final response = await _supabase.auth.signUp(
         email: email,
         password: password,
         data: {
@@ -48,6 +50,15 @@ class AuthProvider extends Notifier<AsyncValue<Session?>> {
           'phone': phone,
         },
       );
+
+      if (response.session == null) {
+        state = AsyncValue.error(
+          'กรุณายืนยันอีเมลที่ส่งไปที่กล่องข้อความของท่าน ก่อนเข้าใช้งาน',
+          StackTrace.current,
+        );
+      }
+    } on AuthException catch (e) {
+      state = AsyncValue.error(e.message, StackTrace.current);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }
