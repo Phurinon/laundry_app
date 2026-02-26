@@ -1,4 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -12,6 +13,9 @@ class NotificationService {
 
   Future<void> init() async {
     tz.initializeTimeZones();
+
+    // Request permissions for Android 13+
+    await Permission.notification.request();
 
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -36,6 +40,17 @@ class NotificationService {
         // Handle notification tap
       },
     );
+
+    // Request permission explicitly for iOS/macOS
+    await _notificationsPlugin
+        .resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin
+        >()
+        ?.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
   }
 
   Future<void> showNotification({
