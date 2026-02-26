@@ -4,6 +4,7 @@ import 'package:laundry_app/models/machine.dart';
 import 'package:laundry_app/models/theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:laundry_app/providers/booking_provider.dart';
+import 'package:laundry_app/providers/machine_signal_provider.dart';
 
 class MachineInfoScreen extends ConsumerStatefulWidget {
   final Machine machine;
@@ -105,6 +106,8 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 30),
+              _buildMockSignalInfo(),
               const SizedBox(height: 30),
               SizedBox(
                 width: double.infinity,
@@ -281,6 +284,106 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildMockSignalInfo() {
+    final signalState = ref.watch(machineSignalProvider);
+    final isWorking =
+        signalState.status != MachineWorkStatus.idle &&
+        signalState.status != MachineWorkStatus.finished;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.blue.withValues(alpha: 0.05),
+        border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'จำลองสัญญาณกระแสไฟ',
+                style: GoogleFonts.prompt(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Colors.blue[800],
+                ),
+              ),
+              if (isWorking)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
+          ),
+          const SizedBox(height: 15),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'กระแสไฟ:',
+                style: GoogleFonts.prompt(color: Colors.black87),
+              ),
+              Text(
+                '${signalState.currentAmps.toStringAsFixed(2)} A',
+                style: GoogleFonts.prompt(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: signalState.currentAmps > 0 ? Colors.red : Colors.grey,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'สถานะ:',
+                style: GoogleFonts.prompt(color: Colors.black87),
+              ),
+              Text(
+                signalState.status.name,
+                style: GoogleFonts.prompt(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue[700],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: isWorking
+                  ? () => ref.read(machineSignalProvider.notifier).resetWork()
+                  : () => ref
+                        .read(machineSignalProvider.notifier)
+                        .startMockWashing(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isWorking ? Colors.red : Colors.blue,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: Text(
+                isWorking ? 'หยุดจำลอง' : 'เริ่มจำลองการทำงาน',
+                style: GoogleFonts.prompt(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
