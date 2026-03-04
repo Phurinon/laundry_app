@@ -41,6 +41,17 @@ class NotificationService {
         // Handle notification tap
       },
     );
+
+    // Request permission explicitly for iOS/macOS
+    await _notificationsPlugin
+        .resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin
+        >()
+        ?.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
   }
 
   Future<void> showNotification({
