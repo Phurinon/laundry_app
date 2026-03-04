@@ -29,9 +29,9 @@ mixin _$Booking {
   @JsonKey(name: 'booking_date')
   DateTime get bookingDate => throw _privateConstructorUsedError;
   @JsonKey(name: 'start_time')
-  String get startTime => throw _privateConstructorUsedError; // Format: HH:MM:SS
+  String get startTime => throw _privateConstructorUsedError;
   @JsonKey(name: 'end_time')
-  String get endTime => throw _privateConstructorUsedError; // Format: HH:MM:SS
+  String get endTime => throw _privateConstructorUsedError;
   @JsonKey(name: 'duration_minutes')
   int get durationMinutes => throw _privateConstructorUsedError;
   @JsonKey(name: 'cycle_type')
@@ -298,11 +298,9 @@ class _$BookingImpl implements _Booking {
   @override
   @JsonKey(name: 'start_time')
   final String startTime;
-  // Format: HH:MM:SS
   @override
   @JsonKey(name: 'end_time')
   final String endTime;
-  // Format: HH:MM:SS
   @override
   @JsonKey(name: 'duration_minutes')
   final int durationMinutes;
@@ -415,10 +413,10 @@ abstract class _Booking implements Booking {
   DateTime get bookingDate;
   @override
   @JsonKey(name: 'start_time')
-  String get startTime; // Format: HH:MM:SS
+  String get startTime;
   @override
   @JsonKey(name: 'end_time')
-  String get endTime; // Format: HH:MM:SS
+  String get endTime;
   @override
   @JsonKey(name: 'duration_minutes')
   int get durationMinutes;
