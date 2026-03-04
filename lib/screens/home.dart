@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,10 +9,12 @@ import 'package:laundry_app/providers/machine_provider.dart';
 import 'package:laundry_app/providers/user_provider.dart';
 import 'package:laundry_app/providers/dormitory_provider.dart';
 import 'package:laundry_app/screens/machine_info.dart';
-import 'package:laundry_app/screens/setting.dart';
+import 'package:laundry_app/screens/my_bookings.dart';
+import 'package:laundry_app/screens/profile.dart';
 import 'package:laundry_app/screens/components/dormitory_selection_sheet.dart';
-import 'package:laundry_app/models/booking.dart';
+import 'package:laundry_app/screens/components/machine_illustration.dart';
 import 'package:laundry_app/providers/booking_provider.dart';
+import 'package:laundry_app/screens/notifications.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,7 +28,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   static const List<Widget> _widgetOptions = <Widget>[
     _HomeContent(),
-    SettingScreen(),
+    MyBookingsScreen(),
+    ProfileScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -38,63 +43,191 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: _widgetOptions.elementAt(_selectedIndex),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: _onItemTapped,
-        backgroundColor: Colors.white,
-        indicatorColor: AppTheme.secondary,
-        destinations: const <NavigationDestination>[
-          NavigationDestination(
-            icon: Icon(Icons.local_laundry_service_rounded),
-            label: 'ซักผ้า',
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(
+                  index: 0,
+                  icon: Icons.home_rounded,
+                  label: 'หน้าหลัก',
+                ),
+                _buildNavItem(
+                  index: 1,
+                  icon: Icons.calendar_month_rounded,
+                  label: 'การจอง',
+                ),
+                _buildNavItem(
+                  index: 2,
+                  icon: Icons.person_outline_rounded,
+                  label: 'โปรไฟล์',
+                ),
+              ],
+            ),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_rounded),
-            label: 'ตั้งค่า',
-          ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem({
+    required int index,
+    required IconData icon,
+    required String label,
+  }) {
+    final isSelected = _selectedIndex == index;
+    return GestureDetector(
+      onTap: () => _onItemTapped(index),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 28,
+              color: isSelected ? AppTheme.primary : AppTheme.neutral400,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: GoogleFonts.prompt(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected ? AppTheme.primary : AppTheme.neutral400,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _HomeContent extends ConsumerWidget {
+class _HomeContent extends ConsumerStatefulWidget {
   const _HomeContent();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_HomeContent> createState() => _HomeContentState();
+}
+
+class _HomeContentState extends ConsumerState<_HomeContent> {
+  final PageController _bannerController = PageController();
+  int _currentBanner = 0;
+  String? _selectedCategory;
+  Timer? _autoScrollTimer;
+  static const int _bannerCount = 3;
+
+  @override
+  void initState() {
+    super.initState();
+    _startAutoScroll();
+  }
+
+  void _startAutoScroll() {
+    _autoScrollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted || !_bannerController.hasClients) return;
+      final nextPage = (_currentBanner + 1) % _bannerCount;
+      _bannerController.animateToPage(
+        nextPage,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _autoScrollTimer?.cancel();
+    _bannerController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final userProfileAsync = ref.watch(userProfileProvider);
     final machineAsync = ref.watch(machineProvider);
+    final activeBookingsAsync = ref.watch(activeBookingsProvider);
 
-    return Scaffold(
-      body: CustomScrollView(
+    // Collect machine IDs that have active bookings right now
+    final bookedMachineIds = <String>{};
+    if (activeBookingsAsync.hasValue) {
+      for (final b in activeBookingsAsync.value!) {
+        // Machine is busy if it has any active booking for today
+        bookedMachineIds.add(b.machineId);
+      }
+    }
+
+    return SafeArea(
+      child: CustomScrollView(
         slivers: [
-          // 1. Brand AppBar
-          SliverAppBar(
-            expandedHeight: 100.0,
-            floating: false,
-            pinned: true,
-            backgroundColor: AppTheme.secondary, // Brand Yellow
-            surfaceTintColor: AppTheme.secondary,
-            flexibleSpace: FlexibleSpaceBar(
-              centerTitle: true,
-              titlePadding: const EdgeInsets.only(bottom: 16),
-              title: Row(
-                mainAxisSize: MainAxisSize.min,
+          // ── Header: WashQ + Notification ──
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Icon(
-                    Icons.local_laundry_service,
-                    color: AppTheme.primary,
-                    size: 28,
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.local_laundry_service_rounded,
+                        color: AppTheme.primary,
+                        size: 32,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'WashQ',
+                        style: GoogleFonts.prompt(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          color: AppTheme.primary,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'LAUNDRY',
-                    style: GoogleFonts.prompt(
-                      color: AppTheme.primary, // Brand Red
-                      fontWeight: FontWeight.w900,
-                      fontSize: 24,
-                      letterSpacing: 1.2,
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.06),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const NotificationsScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(
+                        Icons.notifications_none_rounded,
+                        color: AppTheme.primary,
+                        size: 26,
+                      ),
                     ),
                   ),
                 ],
@@ -102,10 +235,7 @@ class _HomeContent extends ConsumerWidget {
             ),
           ),
 
-          const SliverToBoxAdapter(
-            child: _MyActiveBookingSection(),
-          ),
-
+          // ── Dorm Location Selector ──
           SliverToBoxAdapter(
             child: userProfileAsync.when(
               data: (user) {
@@ -113,184 +243,262 @@ class _HomeContent extends ConsumerWidget {
                 final dormId = user.dormitoryId;
 
                 return Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      // Welcome Card
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: AppTheme.primary,
-                            width: 2,
-                          ), // Red Border
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                  child: InkWell(
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(24),
+                          ),
                         ),
-                        child: Column(
-                          children: [
-                            Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 25,
-                                  backgroundColor: AppTheme.secondary,
-                                  child: Text(
-                                    user.fullName.isNotEmpty
-                                        ? user.fullName[0]
-                                        : 'U',
-                                    style: GoogleFonts.prompt(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.primary,
-                                    ),
+                        builder: (context) => const DormitorySelectionSheet(),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          color: AppTheme.success,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 4),
+                        if (dormId != null)
+                          Consumer(
+                            builder: (context, ref, _) {
+                              final dormAsync = ref.watch(
+                                dormitoryProvider(dormId),
+                              );
+                              return dormAsync.when(
+                                data: (dorm) => Text(
+                                  dorm?.name ?? 'ไม่ระบุหอพัก',
+                                  style: GoogleFonts.prompt(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.textPrimary,
                                   ),
                                 ),
-                                const SizedBox(width: 15),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'สวัสดี, คุณ${user.fullName}',
-                                        style: GoogleFonts.prompt(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppTheme.textPrimary,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      if (dormId != null)
-                                        Consumer(
-                                          builder: (context, ref, _) {
-                                            final dormAsync = ref.watch(
-                                              dormitoryProvider(dormId),
-                                            );
-                                            return InkWell(
-                                              onTap: () {
-                                                showModalBottomSheet(
-                                                  context: context,
-                                                  isScrollControlled: true,
-                                                  shape: const RoundedRectangleBorder(
-                                                    borderRadius:
-                                                        BorderRadius.vertical(
-                                                          top: Radius.circular(
-                                                            24,
-                                                          ),
-                                                        ),
-                                                  ),
-                                                  builder: (context) =>
-                                                      const DormitorySelectionSheet(),
-                                                );
-                                              },
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  dormAsync.when(
-                                                    data: (dorm) => Text(
-                                                      '📍 ${dorm?.name ?? "ไม่ระบุหอพัก"}',
-                                                      style: GoogleFonts.prompt(
-                                                        color: AppTheme
-                                                            .textSecondary,
-                                                        fontSize: 14,
-                                                        decoration:
-                                                            TextDecoration
-                                                                .underline,
-                                                      ),
-                                                    ),
-                                                    loading: () =>
-                                                        const Text('...'),
-                                                    error: (err, stack) =>
-                                                        const Text(
-                                                          'ไม่พบข้อมูลหอพัก',
-                                                        ),
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  const Icon(
-                                                    Icons.edit_rounded,
-                                                    size: 14,
-                                                    color:
-                                                        AppTheme.textSecondary,
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                          },
-                                        )
-                                      else
-                                        InkWell(
-                                          onTap: () {
-                                            showModalBottomSheet(
-                                              context: context,
-                                              isScrollControlled: true,
-                                              shape:
-                                                  const RoundedRectangleBorder(
-                                                    borderRadius:
-                                                        BorderRadius.vertical(
-                                                          top: Radius.circular(
-                                                            24,
-                                                          ),
-                                                        ),
-                                                  ),
-                                              builder: (context) =>
-                                                  const DormitorySelectionSheet(),
-                                            );
-                                          },
-                                          child: Text(
-                                            'ยังไม่ได้เลือกหอพัก (คลิกเพื่อเลือก)',
-                                            style: GoogleFonts.prompt(
-                                              color: AppTheme.error,
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.bold,
-                                              decoration:
-                                                  TextDecoration.underline,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
+                                loading: () => Text(
+                                  '...',
+                                  style: GoogleFonts.prompt(
+                                    color: AppTheme.textSecondary,
                                   ),
                                 ),
-                              ],
+                                error: (_, __) => Text(
+                                  'ไม่พบข้อมูลหอพัก',
+                                  style: GoogleFonts.prompt(
+                                    color: AppTheme.error,
+                                  ),
+                                ),
+                              );
+                            },
+                          )
+                        else
+                          Text(
+                            'เลือกหอพัก',
+                            style: GoogleFonts.prompt(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.error,
                             ),
-                          ],
+                          ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: AppTheme.primary,
+                          size: 20,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 );
               },
-              loading: () => const Padding(
-                padding: EdgeInsets.all(20),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (err, _) =>
-                  Center(child: Text('Error loading profile: $err')),
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
             ),
           ),
 
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              child: Text(
-                'เครื่องซักผ้าที่ว่าง',
-                style: GoogleFonts.prompt(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.primary,
-                ),
+              padding: const EdgeInsets.fromLTRB(0, 20, 0, 0),
+              child: Column(
+                children: [
+                  SizedBox(
+                    height: 160,
+                    child: PageView(
+                      controller: _bannerController,
+                      onPageChanged: (i) => setState(() => _currentBanner = i),
+                      children: [
+                        _buildBanner(
+                          title: 'จองคิวซักผ้า',
+                          subtitle: 'สะดวก รวดเร็ว\nไม่ต้องรอคิว!',
+                          icon: Icons.local_laundry_service_rounded,
+                          gradient: const [
+                            AppTheme.primary,
+                            AppTheme.primaryDark,
+                          ],
+                        ),
+                        _buildBanner(
+                          title: 'เช็คสถานะเครื่อง',
+                          subtitle: 'ดูสถานะเครื่องซักผ้า\nแบบเรียลไทม์',
+                          icon: Icons.timer_rounded,
+                          gradient: const [
+                            AppTheme.success,
+                            Color(0xFF4A9B6E),
+                          ],
+                        ),
+                        _buildBanner(
+                          title: 'แจ้งเตือนอัตโนมัติ',
+                          subtitle: 'รับแจ้งเตือนเมื่อ\nเครื่องซักเสร็จ',
+                          icon: Icons.notifications_active_rounded,
+                          gradient: const [
+                            AppTheme.accent,
+                            AppTheme.accentDark,
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Dots indicator
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      3,
+                      (i) => AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        margin: const EdgeInsets.symmetric(horizontal: 3),
+                        width: _currentBanner == i ? 20 : 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: _currentBanner == i
+                              ? AppTheme.primary
+                              : AppTheme.neutral200,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
 
+          // ── Category Section ──
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+              child: Text(
+                'ค้นหาตามประเภท',
+                style: GoogleFonts.prompt(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 100,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  _buildCategoryCard(
+                    label: 'ทั้งหมด',
+                    icon: MachineCategoryIcon(
+                      size: 32,
+                      color: _selectedCategory == null
+                          ? AppTheme.primary
+                          : AppTheme.neutral400,
+                    ),
+                    category: null,
+                  ),
+                  _buildCategoryCard(
+                    label: 'เครื่องซัก',
+                    icon: MachineCategoryIcon(
+                      machineType: MachineType.washer,
+                      size: 36,
+                      color: _selectedCategory == 'washer'
+                          ? AppTheme.primary
+                          : AppTheme.neutral400,
+                    ),
+                    category: 'washer',
+                  ),
+                  _buildCategoryCard(
+                    label: 'เครื่องอบ',
+                    icon: MachineCategoryIcon(
+                      machineType: MachineType.dryer,
+                      size: 36,
+                      color: _selectedCategory == 'dryer'
+                          ? AppTheme.accent
+                          : AppTheme.neutral400,
+                    ),
+                    category: 'dryer',
+                  ),
+                  _buildCategoryCard(
+                    label: 'ว่างเท่านั้น',
+                    icon: MachineCategoryIcon(
+                      isAvailable: true,
+                      size: 32,
+                      color: _selectedCategory == 'available'
+                          ? AppTheme.success
+                          : AppTheme.neutral400,
+                    ),
+                    category: 'available',
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // ── Machine List Header ──
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'เครื่องซักผ้า',
+                    style: GoogleFonts.prompt(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  machineAsync.when(
+                    data: (machines) {
+                      final user = userProfileAsync.asData?.value;
+                      final userDormId = user?.dormitoryId;
+                      if (userDormId == null) return const SizedBox.shrink();
+                      final filtered = _filterMachines(
+                        machines
+                            .where((m) => m.dormitoryId == userDormId)
+                            .toList(),
+                        bookedMachineIds,
+                      );
+                      return Text(
+                        '${filtered.length} เครื่อง',
+                        style: GoogleFonts.prompt(
+                          fontSize: 14,
+                          color: AppTheme.textSecondary,
+                        ),
+                      );
+                    },
+                    error: (_, __) => const SizedBox.shrink(),
+                    loading: () => const SizedBox.shrink(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // ── Machine Grid ──
           machineAsync.when(
             data: (machines) {
               final user = userProfileAsync.asData?.value;
@@ -298,6 +506,7 @@ class _HomeContent extends ConsumerWidget {
 
               if (userDormId == null) {
                 return SliverFillRemaining(
+                  hasScrollBody: false,
                   child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -305,7 +514,7 @@ class _HomeContent extends ConsumerWidget {
                         const Icon(
                           Icons.apartment_rounded,
                           size: 64,
-                          color: AppTheme.secondary,
+                          color: AppTheme.secondaryLight,
                         ),
                         const SizedBox(height: 24),
                         Text(
@@ -340,13 +549,19 @@ class _HomeContent extends ConsumerWidget {
                             );
                           },
                           icon: const Icon(Icons.touch_app_rounded),
-                          label: const Text('เลือกหอพัก'),
+                          label: Text(
+                            'เลือกหอพัก',
+                            style: GoogleFonts.prompt(),
+                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.primary,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 32,
                               vertical: 16,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
                             ),
                           ),
                         ),
@@ -356,13 +571,14 @@ class _HomeContent extends ConsumerWidget {
                 );
               }
 
-              // Filter by Dorm ID
-              final filteredMachines = machines
-                  .where((m) => m.dormitoryId == userDormId)
-                  .toList();
+              final filteredMachines = _filterMachines(
+                machines.where((m) => m.dormitoryId == userDormId).toList(),
+                bookedMachineIds,
+              );
 
               if (filteredMachines.isEmpty) {
                 return SliverFillRemaining(
+                  hasScrollBody: false,
                   child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -370,7 +586,7 @@ class _HomeContent extends ConsumerWidget {
                         const Icon(
                           Icons.search_off_rounded,
                           size: 64,
-                          color: Colors.grey,
+                          color: AppTheme.neutral400,
                         ),
                         const SizedBox(height: 16),
                         Text(
@@ -389,12 +605,16 @@ class _HomeContent extends ConsumerWidget {
               // Sort: Available first, then by number
               final sortedMachines = [...filteredMachines];
               sortedMachines.sort((a, b) {
-                if (a.status == MachineStatus.available &&
-                    b.status != MachineStatus.available) {
+                final aAvailable =
+                    a.status == MachineStatus.available &&
+                    !bookedMachineIds.contains(a.id);
+                final bAvailable =
+                    b.status == MachineStatus.available &&
+                    !bookedMachineIds.contains(b.id);
+                if (aAvailable && !bAvailable) {
                   return -1;
                 }
-                if (a.status != MachineStatus.available &&
-                    b.status == MachineStatus.available) {
+                if (!aAvailable && bAvailable) {
                   return 1;
                 }
                 return a.machineNumber.compareTo(b.machineNumber);
@@ -405,17 +625,18 @@ class _HomeContent extends ConsumerWidget {
                   horizontal: 16,
                   vertical: 8,
                 ),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 200,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    childAspectRatio: 0.8,
-                  ),
+                sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
                       final machine = sortedMachines[index];
-                      return _MachineCard(machine: machine);
+                      final isBooked = bookedMachineIds.contains(machine.id);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _MachineCard(
+                          machine: machine,
+                          isBooked: isBooked,
+                        ),
+                      );
                     },
                     childCount: sortedMachines.length,
                   ),
@@ -423,13 +644,139 @@ class _HomeContent extends ConsumerWidget {
               );
             },
             error: (err, stack) => SliverFillRemaining(
-              child: Center(child: Text('Error: $err')),
+              hasScrollBody: false,
+              child: Center(child: Text('เกิดข้อผิดพลาด: $err')),
             ),
             loading: () => const SliverFillRemaining(
+              hasScrollBody: false,
               child: Center(child: CircularProgressIndicator()),
             ),
           ),
+
+          // Bottom padding
+          const SliverToBoxAdapter(child: SizedBox(height: 16)),
         ],
+      ),
+    );
+  }
+
+  List<Machine> _filterMachines(
+    List<Machine> machines,
+    Set<String> bookedMachineIds,
+  ) {
+    if (_selectedCategory == null) return machines;
+    if (_selectedCategory == 'washer') {
+      return machines
+          .where((m) => m.machineType == MachineType.washer)
+          .toList();
+    }
+    if (_selectedCategory == 'dryer') {
+      return machines.where((m) => m.machineType == MachineType.dryer).toList();
+    }
+    if (_selectedCategory == 'available') {
+      return machines
+          .where(
+            (m) =>
+                m.status == MachineStatus.available &&
+                !bookedMachineIds.contains(m.id),
+          )
+          .toList();
+    }
+    return machines;
+  }
+
+  Widget _buildBanner({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required List<Color> gradient,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: gradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.prompt(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.prompt(
+                    fontSize: 14,
+                    color: Colors.white.withValues(alpha: 0.9),
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 40, color: Colors.white),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryCard({
+    required String label,
+    required Widget icon,
+    required String? category,
+  }) {
+    final isSelected = _selectedCategory == category;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedCategory = category),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 90,
+        margin: const EdgeInsets.symmetric(horizontal: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.primaryLightest : AppTheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? AppTheme.primary : AppTheme.neutral200,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            icon,
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: GoogleFonts.prompt(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected ? AppTheme.primary : AppTheme.textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -437,32 +784,29 @@ class _HomeContent extends ConsumerWidget {
 
 class _MachineCard extends StatelessWidget {
   final Machine machine;
+  final bool isBooked;
 
-  const _MachineCard({required this.machine});
+  const _MachineCard({required this.machine, this.isBooked = false});
 
   @override
   Widget build(BuildContext context) {
-    final isAvailable = machine.status == MachineStatus.available;
+    // Machine is unavailable if DB status says so OR if there's an active booking
+    final isAvailable = machine.status == MachineStatus.available && !isBooked;
     final statusColor = isAvailable ? AppTheme.success : AppTheme.error;
-
-    // 1. Estimated Duration
     final duration = machine.machineType == MachineType.washer ? '40' : '50';
+    final isWasher = machine.machineType == MachineType.washer;
+    final typeName = isWasher ? 'เครื่องซักผ้า' : 'เครื่องอบผ้า';
 
-    // 2. Pseudo-random Badges (Deterministic based on ID)
-    // We use the hash code of the ID to decide if we show a badge
-    final showPopular = (machine.id.hashCode % 3 == 0); // 33% chance
-    final showAvailableOften =
-        (!showPopular && (machine.id.hashCode % 2 == 0)); // 33% chance
+    final showPopular = (machine.id.hashCode % 3 == 0);
+    final showAvailableOften = (!showPopular && (machine.id.hashCode % 2 == 0));
 
     return Card(
-      elevation: 4,
+      elevation: 2,
+      shadowColor: Colors.black.withValues(alpha: 0.08),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: isAvailable ? AppTheme.success : AppTheme.secondary,
-          width: 2,
-        ),
+        borderRadius: BorderRadius.circular(16),
       ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
           Navigator.push(
@@ -472,70 +816,50 @@ class _MachineCard extends StatelessWidget {
             ),
           );
         },
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: SizedBox(
+          height: 140,
+          child: Row(
             children: [
-              // Header: Number + Badge
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primary,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      machine.machineNumber,
-                      style: GoogleFonts.prompt(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
+              // Left: Machine image area
+              Container(
+                width: 130,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isWasher
+                        ? [AppTheme.primaryLight, AppTheme.primaryLightest]
+                        : [AppTheme.accentLight, AppTheme.accentLightest],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  if (showPopular)
-                    _buildBadge('จองบ่อย', Colors.orange)
-                  else if (showAvailableOften)
-                    _buildBadge('ว่างบ่อย', Colors.blue),
-                  Icon(Icons.circle, color: statusColor, size: 12),
-                ],
-              ),
-
-              // Icon & Duration
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                ),
+                child: Stack(
                   children: [
-                    Icon(
-                      machine.machineType == MachineType.washer
-                          ? Icons.local_laundry_service_rounded
-                          : Icons.dry_cleaning_rounded,
-                      size: 40,
-                      color: AppTheme.textPrimary,
+                    Center(
+                      child: MachineIllustration(
+                        machineType: machine.machineType,
+                        size: 80,
+                      ),
                     ),
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppTheme.background,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '~$duration นาที',
-                        style: GoogleFonts.prompt(
-                          fontSize: 10,
-                          color: AppTheme.textSecondary,
+                    // Machine number badge
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          machine.machineNumber,
+                          style: GoogleFonts.prompt(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
                         ),
                       ),
                     ),
@@ -543,25 +867,116 @@ class _MachineCard extends StatelessWidget {
                 ),
               ),
 
-              // Footer: Status Text & Price
-              Column(
-                children: [
-                  Text(
-                    isAvailable ? 'ว่าง' : 'ไม่ว่าง',
-                    style: GoogleFonts.prompt(
-                      color: statusColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
+              // Right: Details
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
                   ),
-                  Text(
-                    '${machine.price} บาท',
-                    style: GoogleFonts.prompt(
-                      color: AppTheme.textSecondary,
-                      fontSize: 12,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Title row with favorite-like icon
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              typeName,
+                              style: GoogleFonts.prompt(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 4),
+
+                      // Rating / badge row
+                      Row(
+                        children: [
+                          if (showPopular) ...[
+                            _buildBadge('จองบ่อย', AppTheme.warning),
+                            const SizedBox(width: 8),
+                          ] else if (showAvailableOften) ...[
+                            _buildBadge('ว่างบ่อย', AppTheme.primary),
+                            const SizedBox(width: 8),
+                          ],
+                          Text(
+                            '${machine.price} บาท',
+                            style: GoogleFonts.prompt(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      // Info row: floor, duration
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.timer_outlined,
+                            size: 14,
+                            color: AppTheme.neutral400,
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            '$duration นาที',
+                            style: GoogleFonts.prompt(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                          if (machine.capacity > 0) ...[
+                            const SizedBox(width: 10),
+                            Icon(
+                              Icons.circle,
+                              size: 4,
+                              color: AppTheme.neutral400,
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              '${machine.capacity} กก.',
+                              style: GoogleFonts.prompt(
+                                fontSize: 12,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+
+                      const Spacer(),
+
+                      // Status badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          isAvailable ? 'ว่าง' : 'ไม่ว่าง',
+                          style: GoogleFonts.prompt(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: statusColor,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ],
           ),
@@ -572,7 +987,7 @@ class _MachineCard extends StatelessWidget {
 
   Widget _buildBadge(String text, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
@@ -581,7 +996,7 @@ class _MachineCard extends StatelessWidget {
       child: Text(
         text,
         style: GoogleFonts.prompt(
-          fontSize: 8,
+          fontSize: 10,
           fontWeight: FontWeight.bold,
           color: color,
         ),
@@ -592,233 +1007,4 @@ class _MachineCard extends StatelessWidget {
 
 extension on Machine {
   int get price => 20;
-}
-
-class _MyActiveBookingSection extends ConsumerWidget {
-  const _MyActiveBookingSection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // 1. Get My Bookings Stream
-    final bookingsStream = ref.watch(bookingProvider).getMyBookings();
-    final machinesAsync = ref.watch(machineProvider);
-
-    return StreamBuilder<List<Booking>>(
-      stream: bookingsStream,
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        // 2. Filter Active Bookings
-        final activeBookings = snapshot.data!.where((b) {
-          return b.status == BookingStatus.pending ||
-              b.status == BookingStatus.checkedIn ||
-              b.status == BookingStatus.inProgress;
-        }).toList();
-
-        if (activeBookings.isEmpty) return const SizedBox.shrink();
-
-        // 3. Take the first one (most urgent)
-        final booking = activeBookings.first;
-        final isStarted = booking.status == BookingStatus.inProgress;
-
-        // 4. Resolve Machine Number
-        String machineLabel = 'เครื่อง ${booking.machineId}';
-        if (machinesAsync.hasValue) {
-          final machine = machinesAsync.value!.cast<Machine?>().firstWhere(
-            (m) => m?.id == booking.machineId,
-            orElse: () => null,
-          );
-          if (machine != null) {
-            machineLabel = 'เครื่อง ${machine.machineNumber}';
-          }
-        }
-
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(
-            16,
-            16,
-            16,
-            0,
-          ), // Added top padding
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppTheme.primary, AppTheme.primaryDark],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.primary.withValues(alpha: 0.3),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.timer_rounded,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            isStarted ? 'กำลังทำงาน...' : 'การจองของคุณ',
-                            style: GoogleFonts.prompt(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              fontSize: 14,
-                            ),
-                          ),
-                          Text(
-                            isStarted
-                                ? 'ซักเสร็จในอีก ${_getTimeRemaining(booking)}'
-                                : 'เริ่มซักในอีก ${_getTimeUntilStart(booking)}',
-                            style: GoogleFonts.prompt(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    _buildStatusChip(booking.status),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.local_laundry_service_rounded,
-                            color: AppTheme.textSecondary,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            machineLabel,
-                            style: GoogleFonts.prompt(
-                              color: AppTheme.textPrimary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        '${booking.startTime.substring(0, 5)} - ${booking.endTime.substring(0, 5)}',
-                        style: GoogleFonts.prompt(
-                          color: AppTheme.textSecondary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  String _getTimeRemaining(Booking booking) {
-    final endTimeStr = booking.endTime;
-    final now = DateTime.now();
-    final parts = endTimeStr.split(':');
-    final endDateTime = DateTime(
-      now.year,
-      now.month,
-      now.day,
-      int.parse(parts[0]),
-      int.parse(parts[1]),
-    );
-
-    final diff = endDateTime.difference(now);
-    if (diff.isNegative) return '0 นาที';
-    return '${diff.inMinutes} นาที';
-  }
-
-  String _getTimeUntilStart(Booking booking) {
-    final startTimeStr = booking.startTime;
-    final now = DateTime.now();
-    final parts = startTimeStr.split(':');
-    final startDateTime = DateTime(
-      now.year,
-      now.month,
-      now.day,
-      int.parse(parts[0]),
-      int.parse(parts[1]),
-    );
-
-    final diff = startDateTime.difference(now);
-    if (diff.isNegative) return 'ตอนนี้';
-    return '${diff.inMinutes} นาที';
-  }
-
-  Widget _buildStatusChip(BookingStatus status) {
-    String label;
-    Color color;
-
-    switch (status) {
-      case BookingStatus.pending:
-        label = 'รอซัก';
-        color = Colors.orange;
-        break;
-      case BookingStatus.checkedIn:
-        label = 'เช็คอินแล้ว';
-        color = Colors.blue;
-        break;
-      case BookingStatus.inProgress:
-        label = 'กำลังซัก';
-        color = Colors.green;
-        break;
-      default:
-        label = 'สถานะอื่น';
-        color = Colors.grey;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color, width: 1),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.prompt(
-          color: color,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
 }

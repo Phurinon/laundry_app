@@ -4,7 +4,9 @@ import 'package:laundry_app/models/machine.dart';
 import 'package:laundry_app/models/theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:laundry_app/providers/booking_provider.dart';
-import 'package:laundry_app/providers/machine_signal_provider.dart';
+import 'package:laundry_app/providers/machine_provider.dart';
+import 'package:laundry_app/screens/components/machine_illustration.dart';
+import 'package:laundry_app/screens/report_machine.dart';
 
 class MachineInfoScreen extends ConsumerStatefulWidget {
   final Machine machine;
@@ -15,133 +17,415 @@ class MachineInfoScreen extends ConsumerStatefulWidget {
   ConsumerState<MachineInfoScreen> createState() => _MachineInfoScreenState();
 }
 
-class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen> {
+class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen>
+    with SingleTickerProviderStateMixin {
   bool _isBooking = false;
+  late AnimationController _animController;
+  late Animation<double> _fadeIn;
+  late Animation<Offset> _slideUp;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _fadeIn = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
+    _slideUp = Tween<Offset>(
+      begin: const Offset(0, 0.08),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
+    _animController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  bool get _isWasher => widget.machine.machineType == MachineType.washer;
+  Color get _machineColor => _isWasher ? AppTheme.primary : AppTheme.accent;
+  String get _typeName => _isWasher ? 'เครื่องซักผ้า' : 'เครื่องอบผ้า';
+  String get _duration => _isWasher ? '~40 นาที' : '~50 นาที';
 
   @override
   Widget build(BuildContext context) {
+    final machine = widget.machine;
+    final statusColor = _getStatusColor(machine.status);
+
     return Scaffold(
       backgroundColor: AppTheme.background,
-      appBar: AppBar(
-        title: Text(
-          'ข้อมูลเครื่องซักผ้า',
-          style: GoogleFonts.prompt(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(30),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
+      body: CustomScrollView(
+        slivers: [
+          // ── Hero Header ──
+          SliverAppBar(
+            expandedHeight: 280,
+            pinned: true,
+            backgroundColor: _machineColor,
+            iconTheme: const IconThemeData(color: Colors.white),
+            actions: [
+              IconButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          ReportMachineScreen(machine: widget.machine),
                     ),
-                  ],
-                ),
-                child: Icon(
-                  widget.machine.machineType == MachineType.washer
-                      ? Icons.local_laundry_service_rounded
-                      : Icons.dry_cleaning_rounded,
-                  size: 80,
-                  color: AppTheme.primary,
-                ),
-              ),
-              const SizedBox(height: 30),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(25),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      'เครื่อง ${widget.machine.machineNumber}',
-                      style: GoogleFonts.prompt(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    _buildStatusBadge(widget.machine.status),
-                    const SizedBox(height: 30),
-                    _buildInfoRow(
-                      'ประเภท',
-                      widget.machine.machineType == MachineType.washer
-                          ? 'เครื่องซักผ้า'
-                          : 'เครื่องอบผ้า',
-                    ),
-                    const Divider(height: 30),
-                    _buildInfoRow(
-                      'ขนาด',
-                      '${widget.machine.capacity} กิโลกรัม',
-                    ),
-                    const Divider(height: 30),
-                    _buildInfoRow('ราคา', '${widget.machine.price} บาท'),
-                    const Divider(height: 30),
-                    _buildInfoRow('ชั้น', '${widget.machine.floor ?? "-"}'),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 30),
-              _buildMockSignalInfo(),
-              const SizedBox(height: 30),
-              SizedBox(
-                width: double.infinity,
-                height: 55,
-                child: ElevatedButton(
-                  onPressed:
-                      widget.machine.status == MachineStatus.available &&
-                          !_isBooking
-                      ? _handleBooking
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    elevation: 5,
-                  ),
-                  child: _isBooking
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : Text(
-                          widget.machine.status == MachineStatus.available
-                              ? 'จองคิว'
-                              : 'ไม่ว่าง',
-                          style: GoogleFonts.prompt(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                ),
+                  );
+                },
+                icon: const Icon(Icons.flag_rounded),
+                tooltip: 'รายงานปัญหา',
               ),
             ],
+            flexibleSpace: FlexibleSpaceBar(
+              background: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      _machineColor,
+                      _machineColor.withValues(alpha: 0.7),
+                      _isWasher ? AppTheme.primaryDark : AppTheme.accentDark,
+                    ],
+                  ),
+                ),
+                child: SafeArea(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 30),
+                      // Machine illustration with glow
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withValues(alpha: 0.15),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              blurRadius: 40,
+                              spreadRadius: 10,
+                            ),
+                          ],
+                        ),
+                        child: MachineIllustration(
+                          machineType: machine.machineType,
+                          size: 110,
+                          primaryColor: Colors.white,
+                          secondaryColor: Colors.white.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Machine number
+                      Text(
+                        'เครื่อง ${machine.machineNumber}',
+                        style: GoogleFonts.prompt(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      // Type label
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          _typeName,
+                          style: GoogleFonts.prompt(
+                            fontSize: 13,
+                            color: Colors.white.withValues(alpha: 0.95),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
+
+          // ── Body Content ──
+          SliverToBoxAdapter(
+            child: FadeTransition(
+              opacity: _fadeIn,
+              child: SlideTransition(
+                position: _slideUp,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+                  child: Column(
+                    children: [
+                      // ── Status Card ──
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: statusColor.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                _getStatusIcon(machine.status),
+                                color: statusColor,
+                                size: 28,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'สถานะเครื่อง',
+                                    style: GoogleFonts.prompt(
+                                      fontSize: 12,
+                                      color: AppTheme.textSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _getStatusText(machine.status),
+                                    style: GoogleFonts.prompt(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: statusColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Animated dot
+                            if (machine.status == MachineStatus.available)
+                              Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: statusColor,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: statusColor.withValues(alpha: 0.4),
+                                      blurRadius: 8,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // ── Info List ──
+                      _buildInfoTile(
+                        icon: Icons.category_rounded,
+                        label: 'ประเภท',
+                        value: _isWasher ? 'ซักผ้า' : 'อบผ้า',
+                        color: _machineColor,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildInfoTile(
+                        icon: Icons.scale_rounded,
+                        label: 'ขนาด',
+                        value: '${machine.capacity} กก.',
+                        color: AppTheme.success,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildInfoTile(
+                        icon: Icons.payments_rounded,
+                        label: 'ราคา',
+                        value: '${machine.price} บาท',
+                        color: AppTheme.warning,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildInfoTile(
+                        icon: Icons.timer_outlined,
+                        label: 'ระยะเวลา',
+                        value: _duration,
+                        color: AppTheme.accentDark,
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      const SizedBox(height: 32),
+
+                      // ── Booking Button ──
+                      SizedBox(
+                        width: double.infinity,
+                        height: 58,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(18),
+                            gradient: machine.status == MachineStatus.available
+                                ? LinearGradient(
+                                    colors: [
+                                      _machineColor,
+                                      _isWasher
+                                          ? AppTheme.primaryDark
+                                          : AppTheme.accentDark,
+                                    ],
+                                  )
+                                : null,
+                            color: machine.status != MachineStatus.available
+                                ? AppTheme.neutral200
+                                : null,
+                            boxShadow: machine.status == MachineStatus.available
+                                ? [
+                                    BoxShadow(
+                                      color: _machineColor.withValues(
+                                        alpha: 0.35,
+                                      ),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 6),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: ElevatedButton(
+                            onPressed:
+                                machine.status == MachineStatus.available &&
+                                    !_isBooking
+                                ? _handleBooking
+                                : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              disabledBackgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                            ),
+                            child: _isBooking
+                                ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2.5,
+                                    ),
+                                  )
+                                : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        machine.status ==
+                                                MachineStatus.available
+                                            ? Icons.calendar_month_rounded
+                                            : Icons.block_rounded,
+                                        color:
+                                            machine.status ==
+                                                MachineStatus.available
+                                            ? Colors.white
+                                            : AppTheme.neutral400,
+                                        size: 22,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        machine.status ==
+                                                MachineStatus.available
+                                            ? 'จองคิวเลย'
+                                            : _getStatusText(machine.status),
+                                        style: GoogleFonts.prompt(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color:
+                                              machine.status ==
+                                                  MachineStatus.available
+                                              ? Colors.white
+                                              : AppTheme.neutral400,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Info Tile (row item) ──
+  Widget _buildInfoTile({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts.prompt(
+                fontSize: 14,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.prompt(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -152,15 +436,15 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen> {
       context: context,
       initialTime: TimeOfDay.fromDateTime(
         now.add(const Duration(minutes: 5)),
-      ), // Default next 5 mins
+      ),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
               primary: AppTheme.primary,
-              onPrimary: Colors.white,
-              surface: Colors.white,
-              onSurface: Colors.black,
+              onPrimary: AppTheme.surface,
+              surface: AppTheme.surface,
+              onSurface: AppTheme.textPrimary,
             ),
           ),
           child: child!,
@@ -190,33 +474,192 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen> {
       return;
     }
 
-    // 2. Confirm Dialog
+    // ── Check time conflict before confirming ──
+    if (!mounted) return;
+    setState(() => _isBooking = true);
+
+    final durationMinutes = _isWasher ? 40 : 50;
+    String? conflictTime;
+    try {
+      conflictTime = await ref
+          .read(bookingProvider)
+          .checkTimeConflict(
+            machineId: widget.machine.id,
+            startTime: selectedDateTime,
+            durationMinutes: durationMinutes,
+          );
+    } catch (_) {
+      // If check fails, let the booking proceed and rely on server-side validation
+    } finally {
+      if (mounted) setState(() => _isBooking = false);
+    }
+
+    if (!mounted) return;
+
+    if (conflictTime != null) {
+      final endTime = selectedDateTime.add(Duration(minutes: durationMinutes));
+      final requestedEnd =
+          '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              const Icon(Icons.event_busy_rounded, color: AppTheme.error),
+              const SizedBox(width: 10),
+              Text(
+                'ช่วงเวลาไม่ว่าง',
+                style: GoogleFonts.prompt(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.error.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.block_rounded,
+                          color: AppTheme.error,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'มีคิวจองอยู่แล้ว: $conflictTime',
+                            style: GoogleFonts.prompt(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.error,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.access_time_rounded,
+                          color: AppTheme.textSecondary,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'คุณเลือก: ${time.format(context)} - $requestedEnd',
+                            style: GoogleFonts.prompt(
+                              fontSize: 13,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'กรุณาเลือกเวลาอื่นที่ไม่ซ้อนกับคิวที่มีอยู่',
+                style: GoogleFonts.prompt(
+                  fontSize: 13,
+                  color: AppTheme.textSecondary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _machineColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Text(
+                'เลือกเวลาใหม่',
+                style: GoogleFonts.prompt(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     if (!mounted) return;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(
-          'ยืนยันการจอง',
-          style: GoogleFonts.prompt(fontWeight: FontWeight.bold),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.calendar_month_rounded, color: _machineColor),
+            const SizedBox(width: 10),
+            Text(
+              'ยืนยันการจอง',
+              style: GoogleFonts.prompt(fontWeight: FontWeight.bold),
+            ),
+          ],
         ),
-        content: Text(
-          'ต้องการจองเครื่อง ${widget.machine.machineNumber}\nเวลา ${time.format(context)} หรือไม่?',
-          style: GoogleFonts.prompt(),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _machineColor.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Column(
+                children: [
+                  _buildDialogRow('เครื่อง', widget.machine.machineNumber),
+                  const SizedBox(height: 8),
+                  _buildDialogRow('เวลา', time.format(context)),
+                  const SizedBox(height: 8),
+                  _buildDialogRow('ราคา', '${widget.machine.price} บาท'),
+                ],
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(
               'ยกเลิก',
-              style: GoogleFonts.prompt(color: Colors.grey),
+              style: GoogleFonts.prompt(color: AppTheme.textSecondary),
             ),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _machineColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
             child: Text(
               'ยืนยัน',
               style: GoogleFonts.prompt(
-                color: AppTheme.primary,
+                color: Colors.white,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -225,7 +668,7 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen> {
       ),
     );
 
-    if (confirm != true || !mounted) return; // Add mounted check
+    if (confirm != true || !mounted) return;
 
     setState(() => _isBooking = true);
     try {
@@ -235,17 +678,34 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen> {
             machineId: widget.machine.id,
             machineNumber: widget.machine.machineNumber,
             startTime: selectedDateTime,
-            durationMinutes: 60, // Default 1 hour for now
+            durationMinutes: durationMinutes,
           );
 
       if (mounted) {
+        // Force refresh providers so home screen updates immediately
+        ref.invalidate(activeBookingsProvider);
+        ref.invalidate(machineProvider);
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('จองคิวสำเร็จ!', style: GoogleFonts.prompt()),
-            backgroundColor: Colors.green,
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white),
+                const SizedBox(width: 8),
+                Text(
+                  'จองคิวสำเร็จ!',
+                  style: GoogleFonts.prompt(color: Colors.white),
+                ),
+              ],
+            ),
+            backgroundColor: AppTheme.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         );
-        Navigator.pop(context); // Go back to Home
+        Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
@@ -255,7 +715,11 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen> {
               'เกิดข้อผิดพลาด: ${e.toString().replaceAll("Exception: ", "")}',
               style: GoogleFonts.prompt(),
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: AppTheme.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         );
       }
@@ -264,151 +728,44 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen> {
     }
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildDialogRow(String label, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label,
           style: GoogleFonts.prompt(
-            fontSize: 16,
-            color: Colors.grey[600],
+            color: AppTheme.textSecondary,
+            fontSize: 14,
           ),
         ),
         Text(
           value,
-          style: GoogleFonts.prompt(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-          ),
+          style: GoogleFonts.prompt(fontWeight: FontWeight.bold, fontSize: 14),
         ),
       ],
     );
   }
 
-  Widget _buildMockSignalInfo() {
-    final signalState = ref.watch(machineSignalProvider);
-    final isWorking =
-        signalState.status != MachineWorkStatus.idle &&
-        signalState.status != MachineWorkStatus.finished;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.blue.withValues(alpha: 0.05),
-        border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'จำลองสัญญาณกระแสไฟ',
-                style: GoogleFonts.prompt(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: Colors.blue[800],
-                ),
-              ),
-              if (isWorking)
-                const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-            ],
-          ),
-          const SizedBox(height: 15),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'กระแสไฟ:',
-                style: GoogleFonts.prompt(color: Colors.black87),
-              ),
-              Text(
-                '${signalState.currentAmps.toStringAsFixed(2)} A',
-                style: GoogleFonts.prompt(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: signalState.currentAmps > 0 ? Colors.red : Colors.grey,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'สถานะ:',
-                style: GoogleFonts.prompt(color: Colors.black87),
-              ),
-              Text(
-                signalState.status.name,
-                style: GoogleFonts.prompt(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue[700],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: isWorking
-                  ? () => ref.read(machineSignalProvider.notifier).resetWork()
-                  : () => ref
-                        .read(machineSignalProvider.notifier)
-                        .startMockWashing(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isWorking ? Colors.red : Colors.blue,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: Text(
-                isWorking ? 'หยุดจำลอง' : 'เริ่มจำลองการทำงาน',
-                style: GoogleFonts.prompt(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusBadge(MachineStatus status) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-      decoration: BoxDecoration(
-        color: _getStatusColor(status).withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        _getStatusText(status),
-        style: GoogleFonts.prompt(
-          color: _getStatusColor(status),
-          fontWeight: FontWeight.bold,
-          fontSize: 16,
-        ),
-      ),
-    );
+  IconData _getStatusIcon(MachineStatus status) {
+    switch (status) {
+      case MachineStatus.available:
+        return Icons.check_circle_rounded;
+      case MachineStatus.inUse:
+        return Icons.play_circle_rounded;
+      case MachineStatus.reserved:
+        return Icons.schedule_rounded;
+      case MachineStatus.maintenance:
+        return Icons.build_circle_rounded;
+      case MachineStatus.overdue:
+        return Icons.warning_rounded;
+    }
   }
 
   String _getStatusText(MachineStatus status) {
     switch (status) {
       case MachineStatus.available:
-        return 'ว่าง';
+        return 'พร้อมใช้งาน';
       case MachineStatus.inUse:
         return 'กำลังทำงาน';
       case MachineStatus.reserved:
@@ -431,7 +788,7 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen> {
       case MachineStatus.maintenance:
         return AppTheme.textSecondary;
       case MachineStatus.overdue:
-        return Colors.purple;
+        return AppTheme.accentDark;
     }
   }
 }

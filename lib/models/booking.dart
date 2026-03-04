@@ -25,8 +25,8 @@ class Booking with _$Booking {
     @JsonKey(name: 'user_id') required String userId,
     @JsonKey(name: 'machine_id') required String machineId,
     @JsonKey(name: 'booking_date') required DateTime bookingDate,
-    @JsonKey(name: 'start_time') required String startTime, // Format: HH:MM:SS
-    @JsonKey(name: 'end_time') required String endTime, // Format: HH:MM:SS
+    @JsonKey(name: 'start_time') required String startTime,
+    @JsonKey(name: 'end_time') required String endTime,
     @JsonKey(name: 'duration_minutes') required int durationMinutes,
     @JsonKey(name: 'cycle_type') String? cycleType,
     @Default(BookingStatus.pending) BookingStatus status,

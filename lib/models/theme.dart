@@ -2,20 +2,46 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  // Palette: LaundryBar Style (Yellow/Red)
-  static const Color primary = Color(0xFFE31E24); // Brand Red
-  static const Color primaryDark = Color(0xFFB71C1C); // Dark Red
-  static const Color secondary = Color(0xFFFFCC00); // Brand Yellow
+  // ── Primary (Blue) ──
+  static const Color primary = Color(0xFF1E90FF);
+  static const Color primaryDark = Color(0xFF217CD2);
+  static const Color primaryLight = Color(0xFFAFD5FB);
+  static const Color primaryLightest = Color(0xFFEEF6FF);
 
-  static const Color background = Color(0xFFFFFDE7); // Light Yellow BG
+  // ── Secondary (Green) ──
+  static const Color secondary = Color(0xFF90EE90);
+  static const Color secondaryDark = Color(0xFF77CA77);
+  static const Color secondaryLight = Color(0xFFD6F9D6);
+  static const Color secondaryLightest = Color(0xFFF3FDF0);
+
+  // ── Accent (Cyan) ──
+  static const Color accent = Color(0xFF40E0D0);
+  static const Color accentDark = Color(0xFF27B0AE);
+  static const Color accentLight = Color(0xFF88ECE2);
+  static const Color accentLightest = Color(0xFFEDF9FA);
+
+  // ── Neutral / Surface ──
+  static const Color background = Color(0xFFF8FAFE);
   static const Color surface = Colors.white;
+  static const Color neutral50 = Color(0xFFF8F7F8);
+  static const Color neutral100 = Color(0xFFE8E8E8);
+  static const Color neutral200 = Color(0xFFD0D0D5);
+  static const Color neutral300 = Color(0xFFB8B8BD);
+  static const Color neutral400 = Color(0xFF8B8B90);
+  static const Color neutral500 = Color(0xFF6B6B70);
+  static const Color neutral700 = Color(0xFF343847);
+  static const Color neutral900 = Color(0xFF141B25);
 
-  static const Color textPrimary = Color(0xFF2D2D2D);
-  static const Color textSecondary = Color(0xFF757575);
+  // ── Text ──
+  static const Color textPrimary = Color(0xFF141B25);
+  static const Color textSecondary = Color(0xFF6B6B70);
 
-  static const Color error = Color(0xFFD32F2F); // Red
-  static const Color success = Color(0xFF43A047); // Green
-  static const Color warning = Color(0xFFFFA000); // Amber
+  // ── Utility ──
+  static const Color error = Color(0xFFCA3A32);
+  static const Color errorLight = Color(0xFFF0766F);
+  static const Color success = Color(0xFF6BC293);
+  static const Color warning = Color(0xFFE8A238);
+  static const Color warningLight = Color(0xFFFFD015);
 
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
@@ -45,7 +71,7 @@ class AppTheme {
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: const BorderSide(color: secondary, width: 2), // Yellow border
+        side: const BorderSide(color: primaryLight, width: 1.5),
       ),
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
     ),
@@ -56,11 +82,11 @@ class AppTheme {
       fillColor: surface,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(30),
-        borderSide: const BorderSide(color: secondary),
+        borderSide: const BorderSide(color: neutral200),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(30),
-        borderSide: const BorderSide(color: secondary),
+        borderSide: const BorderSide(color: neutral200),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(30),

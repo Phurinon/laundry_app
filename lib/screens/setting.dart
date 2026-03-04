@@ -34,7 +34,7 @@ class SettingScreen extends StatelessWidget {
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red[400],
+                    backgroundColor: AppTheme.error,
                     padding: EdgeInsets.symmetric(vertical: 15),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -54,7 +54,7 @@ class SettingScreen extends StatelessWidget {
                     style: GoogleFonts.prompt(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: AppTheme.surface,
                     ),
                   ),
                 ),
@@ -66,14 +66,16 @@ class SettingScreen extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const ProfileScreen(),
+                      builder: (context) =>
+                          const ProfileScreen(showBackButton: true),
                     ),
                   );
                 } else if (settingList[index].title == 'การจองของฉัน') {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const MyBookingsScreen(),
+                      builder: (context) =>
+                          const MyBookingsScreen(showBackButton: true),
                     ),
                   );
                 } else if (settingList[index].title == 'เกี่ยวกับ') {
@@ -87,8 +89,9 @@ class SettingScreen extends StatelessWidget {
               },
               child: Container(
                 decoration: BoxDecoration(
-                  color: AppTheme.secondary,
+                  color: AppTheme.primaryLightest,
                   borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.primaryLight),
                 ),
                 padding: EdgeInsets.all(15),
                 margin: EdgeInsets.all(10),
@@ -103,14 +106,14 @@ class SettingScreen extends StatelessWidget {
                           style: GoogleFonts.prompt(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: AppTheme.primaryDark,
                           ),
                         ),
                       ],
                     ),
                     Icon(
                       settingList[index].icon,
-                      color: Colors.white,
+                      color: AppTheme.primary,
                     ),
                   ],
                 ),

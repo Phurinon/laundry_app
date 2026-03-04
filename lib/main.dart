@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:laundry_app/screens/register.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:laundry_app/models/theme.dart';
+import 'package:laundry_app/screens/splash.dart';
 import 'package:laundry_app/services/notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:laundry_app/config/supabase_config.dart';
@@ -11,7 +12,6 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
 
-  // Initialize Notifications
   await NotificationService().init();
 
   await Supabase.initialize(
@@ -29,9 +29,18 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Laundry App',
+      title: 'WashQ',
       theme: AppTheme.lightTheme,
-      home: RegisterScreen(),
+      locale: const Locale('th', 'TH'),
+      supportedLocales: const [
+        Locale('th', 'TH'),
+      ],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      home: const SplashScreen(),
     );
   }
 }
