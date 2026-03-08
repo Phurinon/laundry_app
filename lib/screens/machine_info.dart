@@ -5,6 +5,7 @@ import 'package:laundry_app/models/theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:laundry_app/providers/booking_provider.dart';
 import 'package:laundry_app/providers/machine_provider.dart';
+import 'package:laundry_app/providers/machine_signal_provider.dart';
 import 'package:laundry_app/screens/components/machine_illustration.dart';
 import 'package:laundry_app/screens/report_machine.dart';
 
@@ -54,6 +55,7 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen>
   Widget build(BuildContext context) {
     final machine = widget.machine;
     final statusColor = _getStatusColor(machine.status);
+    final signalState = ref.watch(machineSignalProvider);
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -270,6 +272,9 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen>
 
                       const SizedBox(height: 20),
 
+                      // ── Simulation Card ──
+                      _buildSimulationCard(signalState),
+
                       const SizedBox(height: 32),
 
                       // ── Booking Button ──
@@ -371,6 +376,198 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen>
                 ),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Simulation Card ──
+  Widget _buildSimulationCard(MachineSignalState signalState) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.monitor_heart_rounded, color: _machineColor),
+                  const SizedBox(width: 8),
+                  Text(
+                    'จำลองการทำงาน',
+                    style: GoogleFonts.prompt(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              if (signalState.status != MachineWorkStatus.idle)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _machineColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    signalState.status.name,
+                    style: GoogleFonts.prompt(
+                      fontSize: 12,
+                      color: _machineColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.background,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.neutral200),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.electrical_services_rounded, size: 20, color: AppTheme.warning),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'กระแสไฟฟ้า',
+                              style: GoogleFonts.prompt(
+                                fontSize: 10,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                            Text(
+                              '${signalState.currentAmps.toStringAsFixed(2)} A',
+                              style: GoogleFonts.prompt(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.background,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.neutral200),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.timer_outlined, size: 20, color: AppTheme.success),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'สถานะ',
+                              style: GoogleFonts.prompt(
+                                fontSize: 10,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                            Text(
+                              signalState.status == MachineWorkStatus.idle ? '-' : 'กำลังทำงาน',
+                              style: GoogleFonts.prompt(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: signalState.status == MachineWorkStatus.idle
+                      ? () => ref.read(machineSignalProvider.notifier).startMockWashing()
+                      : null,
+                  icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                  label: Text(
+                    'เริ่มจำลอง',
+                    style: GoogleFonts.prompt(fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _machineColor,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: AppTheme.neutral200,
+                    disabledForegroundColor: AppTheme.neutral400,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: signalState.status != MachineWorkStatus.idle
+                      ? () => ref.read(machineSignalProvider.notifier).resetWork()
+                      : null,
+                  icon: const Icon(Icons.refresh_rounded, size: 20),
+                  label: Text(
+                    'รีเซ็ต',
+                    style: GoogleFonts.prompt(fontWeight: FontWeight.bold),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.error,
+                    side: BorderSide(
+                      color: signalState.status != MachineWorkStatus.idle
+                          ? AppTheme.error
+                          : AppTheme.neutral200,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

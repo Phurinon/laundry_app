@@ -116,7 +116,7 @@ class MachineSignalNotifier extends Notifier<MachineSignalState> {
   void _triggerNotification() {
     NotificationService().showNotification(
       id: 999,
-      title: 'ซักผ้าเสร็จแล้ว! 🧺',
+      title: 'ผ้าของคุณซักเสร็จแล้ว! 🧺',
       body: 'รบกวนนำผ้าออกจากเครื่องและปิดฝาด้วยครับ',
     );
   }
