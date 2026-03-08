@@ -52,6 +52,13 @@ class NotificationService {
           badge: true,
           sound: true,
         );
+
+    // Request permission explicitly for Android 13+
+    await _notificationsPlugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.requestNotificationsPermission();
   }
 
   Future<void> showNotification({
