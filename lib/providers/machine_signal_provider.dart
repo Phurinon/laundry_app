@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:laundry_app/services/notification_service.dart';
+import 'package:laundry_app/providers/booking_provider.dart';
+import 'package:laundry_app/providers/machine_provider.dart';
 
 enum MachineWorkStatus { idle, fillingWater, washing, spinning, finished }
 
@@ -25,19 +27,23 @@ extension MachineWorkStatusExt on MachineWorkStatus {
 class MachineSignalState {
   final double currentAmps;
   final MachineWorkStatus status;
+  final String? machineId;
 
   MachineSignalState({
     this.currentAmps = 0.0,
     this.status = MachineWorkStatus.idle,
+    this.machineId,
   });
 
   MachineSignalState copyWith({
     double? currentAmps,
     MachineWorkStatus? status,
+    String? machineId,
   }) {
     return MachineSignalState(
       currentAmps: currentAmps ?? this.currentAmps,
       status: status ?? this.status,
+      machineId: machineId ?? this.machineId,
     );
   }
 }
@@ -53,19 +59,18 @@ class MachineSignalNotifier extends Notifier<MachineSignalState> {
     return MachineSignalState();
   }
 
-  void startMockWashing() {
+  void startMockWashing({required String machineId, String? bookingId}) {
     _subscription?.cancel();
 
-    // Reset state before starting
     state = MachineSignalState(
       currentAmps: 0.0,
       status: MachineWorkStatus.fillingWater,
+      machineId: machineId,
     );
 
-    _subscription = _getMachineCurrentStream().listen((amps) {
+    _subscription = _getMachineCurrentStream().listen((amps) async {
       final newStatus = _determineStatus(amps);
 
-      // Check if finished (status changes to idle and it was doing something)
       if (state.status != MachineWorkStatus.idle &&
           newStatus == MachineWorkStatus.idle) {
         state = state.copyWith(
@@ -73,6 +78,16 @@ class MachineSignalNotifier extends Notifier<MachineSignalState> {
           status: MachineWorkStatus.finished,
         );
         _triggerNotification();
+
+        if (bookingId != null) {
+          try {
+            await ref.read(bookingProvider).completeBooking(bookingId);
+            ref.invalidate(myBookingsProvider);
+            ref.invalidate(activeBookingsProvider);
+            ref.invalidate(machineProvider);
+          } catch (e) {}
+        }
+
         _subscription?.cancel();
       } else {
         state = state.copyWith(currentAmps: amps, status: newStatus);
@@ -90,16 +105,21 @@ class MachineSignalNotifier extends Notifier<MachineSignalState> {
 
   Stream<double> _getMachineCurrentStream() async* {
     final mockAmpsCycle = [
-      0.5, 0.8, // เติมน้ำ
-      3.2, 4.5, 2.1, 4.0, // ซัก
-      8.5, 9.2, 7.8, // ปั่นหมาด
-      0.0, 0.0, // เสร็จสิ้น (Idle)
+      0.5,
+      0.8,
+      3.2,
+      4.5,
+      2.1,
+      4.0,
+      8.5,
+      9.2,
+      7.8,
+      0.0,
+      0.0,
     ];
 
     for (var amp in mockAmpsCycle) {
-      await Future.delayed(
-        const Duration(seconds: 2),
-      ); // สมมติ 1 สเตป = 2 วิ เพื่อให้เห็นภาพช้าขึ้น
+      await Future.delayed(const Duration(seconds: 2));
       final noise = (Random().nextDouble() * 0.2) - 0.1;
       yield (amp > 0) ? amp + noise : amp;
     }
@@ -116,7 +136,7 @@ class MachineSignalNotifier extends Notifier<MachineSignalState> {
   void _triggerNotification() {
     NotificationService().showNotification(
       id: 999,
-      title: 'ผ้าของคุณซักเสร็จแล้ว! 🧺',
+      title: 'ผ้าของคุณซักเสร็จแล้ว!',
       body: 'รบกวนนำผ้าออกจากเครื่องและปิดฝาด้วยครับ',
     );
   }

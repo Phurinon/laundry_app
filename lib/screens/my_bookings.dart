@@ -7,12 +7,8 @@ import 'package:laundry_app/models/theme.dart';
 import 'package:laundry_app/providers/booking_provider.dart';
 import 'package:laundry_app/providers/machine_provider.dart';
 import 'package:laundry_app/screens/components/machine_illustration.dart';
-import 'package:laundry_app/screens/qr_scanner_screen.dart';
+import 'package:laundry_app/screens/booking_detail.dart';
 import 'package:intl/intl.dart';
-
-final myBookingsProvider = StreamProvider.autoDispose<List<Booking>>((ref) {
-  return ref.watch(bookingProvider).getMyBookings();
-});
 
 enum BookingFilter { all, active, completed, cancelled }
 
@@ -43,7 +39,6 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
     );
     _animController.forward();
 
-    // Check for overdue bookings (auto no-show after 15 mins)
     Future.microtask(() {
       ref.read(bookingProvider).checkOverdueBookings();
     });
@@ -116,13 +111,11 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
       body: SafeArea(
         child: bookingsAsync.when(
           data: (bookings) {
-            // Sort: newest first
             final sorted = [...bookings];
-            sorted.sort((a, b) => b.bookingDate.compareTo(a.bookingDate));
+            sorted.sort((a, b) => b.startTime.compareTo(a.startTime));
 
             final filtered = _applyFilter(sorted);
 
-            // Stats
             final activeCount = bookings
                 .where(
                   (b) =>
@@ -146,7 +139,6 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
               opacity: _fadeAnim,
               child: CustomScrollView(
                 slivers: [
-                  // ── Header ──
                   SliverToBoxAdapter(
                     child: _buildHeader(
                       total: bookings.length,
@@ -156,7 +148,6 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
                     ),
                   ),
 
-                  // ── Filter Chips ──
                   SliverToBoxAdapter(
                     child: _buildFilterChips(
                       activeCount: activeCount,
@@ -166,7 +157,6 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
                     ),
                   ),
 
-                  // ── Booking List or Empty State ──
                   if (filtered.isEmpty)
                     SliverFillRemaining(
                       hasScrollBody: false,
@@ -179,7 +169,6 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
                         delegate: SliverChildBuilderDelegate(
                           (context, index) {
                             final booking = filtered[index];
-                            // Resolve machine
                             Machine? machine;
                             if (machinesAsync.hasValue) {
                               machine = machinesAsync.value!
@@ -240,7 +229,6 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
     );
   }
 
-  // ── Header with summary stats ──
   Widget _buildHeader({
     required int total,
     required int active,
@@ -440,7 +428,6 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Count badge
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 250),
                       padding: const EdgeInsets.symmetric(
@@ -463,7 +450,6 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
                       ),
                     ),
                     const SizedBox(height: 3),
-                    // Label
                     Text(
                       f.label,
                       style: GoogleFonts.prompt(
@@ -477,7 +463,6 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
                       ),
                     ),
                     const SizedBox(height: 4),
-                    // Active indicator dot
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 250),
                       width: isSelected ? 16 : 0,
@@ -497,7 +482,6 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
     );
   }
 
-  // ── Empty State ──
   Widget _buildEmptyState() {
     String message;
     IconData icon;
@@ -620,35 +604,9 @@ class _BookingCard extends ConsumerWidget {
     required this.index,
   });
 
-  /// Check if booking time has arrived (current time >= start time on booking date)
-  bool _isTimeToCheckIn() {
-    final now = DateTime.now();
-    final startParts = booking.startTime.split(':');
-    final bookingStart = DateTime(
-      booking.bookingDate.year,
-      booking.bookingDate.month,
-      booking.bookingDate.day,
-      int.parse(startParts[0]),
-      int.parse(startParts[1]),
-    );
-    // Allow check-in from 5 minutes before start time
-    return now.isAfter(bookingStart.subtract(const Duration(minutes: 5)));
-    // Allow check-in only from the exact start time
-    // return now.isAfter(bookingStart) || now.isAtSameMomentAs(bookingStart);
-  }
-
-  /// Check if booking has passed end time (for auto-complete hint)
   bool _isPastEndTime() {
     final now = DateTime.now();
-    final endParts = booking.endTime.split(':');
-    final bookingEnd = DateTime(
-      booking.bookingDate.year,
-      booking.bookingDate.month,
-      booking.bookingDate.day,
-      int.parse(endParts[0]),
-      int.parse(endParts[1]),
-    );
-    return now.isAfter(bookingEnd);
+    return now.isAfter(booking.endTime);
   }
 
   @override
@@ -661,18 +619,20 @@ class _BookingCard extends ConsumerWidget {
         booking.status == BookingStatus.cancelled ||
         booking.status == BookingStatus.noShow;
 
-    final canCheckIn = isPending && _isTimeToCheckIn();
     final canComplete = isInProgress;
     final pastEndTime = isInProgress && _isPastEndTime();
 
-    final dateStr = DateFormat('d MMM yyyy', 'th').format(booking.bookingDate);
-    final dayStr = DateFormat('EEE', 'th').format(booking.bookingDate);
+    final dateStr = DateFormat(
+      'd MMM yyyy',
+      'th',
+    ).format(booking.startTime.toLocal());
+    final dayStr = DateFormat('EEE', 'th').format(booking.startTime.toLocal());
     final timeStr =
-        '${booking.startTime.substring(0, 5)} - ${booking.endTime.substring(0, 5)}';
+        '${DateFormat('HH:mm').format(booking.startTime.toLocal())} - ${DateFormat('HH:mm').format(booking.endTime.toLocal())}';
 
     final isWasher = machine?.machineType == MachineType.washer;
     final machineLabel = machine != null
-        ? '${isWasher ? "เครื่องซักผ้า" : "เครื่องอบผ้า"}'
+        ? (isWasher ? "เครื่องซักผ้า" : "เครื่องอบผ้า")
         : 'เครื่อง';
 
     return TweenAnimationBuilder<double>(
@@ -696,383 +656,318 @@ class _BookingCard extends ConsumerWidget {
         ),
         clipBehavior: Clip.antiAlias,
         margin: const EdgeInsets.only(bottom: 12),
-        child: Column(
-          children: [
-            SizedBox(
-              height: (isPending || isInProgress) ? 170 : 140,
-              child: Row(
-                children: [
-                  // ── Left: Machine illustration area ──
-                  Container(
-                    width: 130,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: isWasher
-                            ? [AppTheme.primaryLight, AppTheme.primaryLightest]
-                            : [AppTheme.accentLight, AppTheme.accentLightest],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    child: Stack(
-                      children: [
-                        // Machine illustration
-                        Center(
-                          child: Opacity(
-                            opacity: isCancelled ? 0.4 : 1.0,
-                            child: machine != null
-                                ? MachineIllustration(
-                                    machineType: machine!.machineType,
-                                    size: 72,
-                                  )
-                                : Icon(
-                                    Icons.local_laundry_service_rounded,
-                                    size: 48,
-                                    color: AppTheme.primary.withValues(
-                                      alpha: 0.5,
-                                    ),
-                                  ),
-                          ),
+        child: InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => BookingDetailScreen(booking: booking),
+              ),
+            );
+          },
+          child: Column(
+            children: [
+              SizedBox(
+                height: (isPending || isInProgress) ? 170 : 140,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 130,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: isWasher
+                              ? [
+                                  AppTheme.primaryLight,
+                                  AppTheme.primaryLightest,
+                                ]
+                              : [AppTheme.accentLight, AppTheme.accentLightest],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                        // Machine number badge (top-left)
-                        if (machine != null)
-                          Positioned(
-                            top: 8,
-                            left: 8,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isWasher
-                                    ? AppTheme.primary
-                                    : AppTheme.accentDark,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                machine!.machineNumber,
-                                style: GoogleFonts.prompt(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 11,
+                      ),
+                      child: Stack(
+                        children: [
+                          Center(
+                            child: Opacity(
+                              opacity: isCancelled ? 0.4 : 1.0,
+                              child: machine != null
+                                  ? MachineIllustration(
+                                      machineType: machine!.machineType,
+                                      size: 72,
+                                    )
+                                  : Icon(
+                                      Icons.local_laundry_service_rounded,
+                                      size: 48,
+                                      color: AppTheme.primary.withValues(
+                                        alpha: 0.5,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          if (machine != null)
+                            Positioned(
+                              top: 8,
+                              left: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isWasher
+                                      ? AppTheme.primary
+                                      : AppTheme.accentDark,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  machine!.machineNumber,
+                                  style: GoogleFonts.prompt(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                      ],
-                    ),
-                  ),
-
-                  // ── Right: Details ──
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Title row
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  machineLabel,
-                                  style: GoogleFonts.prompt(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: isCancelled
-                                        ? AppTheme.neutral400
-                                        : AppTheme.textPrimary,
-                                    decoration: isCancelled
-                                        ? TextDecoration.lineThrough
-                                        : null,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 4),
-
-                          // Date + time badges row
-                          Row(
-                            children: [
-                              _buildBadge(
-                                '$dayStr $dateStr',
-                                isWasher
-                                    ? AppTheme.primary
-                                    : AppTheme.accentDark,
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 6),
-
-                          // Time & duration info row
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.access_time_rounded,
-                                size: 14,
-                                color: AppTheme.neutral400,
-                              ),
-                              const SizedBox(width: 3),
-                              Text(
-                                timeStr,
-                                style: GoogleFonts.prompt(
-                                  fontSize: 12,
-                                  color: AppTheme.textSecondary,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Icon(
-                                Icons.circle,
-                                size: 4,
-                                color: AppTheme.neutral400,
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                '${booking.durationMinutes} นาที',
-                                style: GoogleFonts.prompt(
-                                  fontSize: 12,
-                                  color: AppTheme.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const Spacer(),
-
-                          // Bottom: Status badge + actions
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: color.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  _statusText(booking.status),
-                                  style: GoogleFonts.prompt(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: color,
-                                  ),
-                                ),
-                              ),
-                              if (isCompleted) ...[
-                                const SizedBox(width: 8),
-                                Icon(
-                                  Icons.verified_rounded,
-                                  size: 16,
-                                  color: AppTheme.success,
-                                ),
-                              ],
-                              const Spacer(),
-
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  // ── Cancel button (pending only) ──
-                                  if (isPending)
-                                    GestureDetector(
-                                      onTap: () => _showCancelDialog(context, ref),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 5,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.error.withValues(
-                                            alpha: 0.08,
-                                          ),
-                                          borderRadius: BorderRadius.circular(20),
-                                          border: Border.all(
-                                            color: AppTheme.error.withValues(
-                                              alpha: 0.25,
-                                            ),
-                                          ),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              Icons.close_rounded,
-                                              size: 14,
-                                              color: AppTheme.error,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              'ยกเลิก',
-                                              style: GoogleFonts.prompt(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                                color: AppTheme.error,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-
-                                  if (isPending && canCheckIn) const SizedBox(height: 8),
-
-                                  // ── Check-in button (pending + time arrived) ──
-                                  if (canCheckIn)
-                                    GestureDetector(
-                                      onTap: () async {
-                                        // 1. Open Scanner
-                                        final scannedId = await Navigator.push<String>(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => QRScannerScreen(
-                                              machineId: booking.machineId,
-                                            ),
-                                          ),
-                                        );
-                                        
-                                        // 2. Validate Result
-                                        if (!context.mounted) return;
-                                        if (scannedId != null) {
-                                          if (scannedId == booking.machineId) {
-                                            _showCheckInDialog(context, ref);
-                                          } else {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  'รหัสเครื่องไม่ถูกต้อง (สแกนได้: $scannedId, ถูกต้องคือ: ${booking.machineId})',
-                                                  style: GoogleFonts.prompt(),
-                                                ),
-                                                backgroundColor: AppTheme.error,
-                                              ),
-                                            );
-                                          }
-                                        }
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 5,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          gradient: const LinearGradient(
-                                            colors: [
-                                              AppTheme.primary,
-                                              Color(0xFF4DA8FF),
-                                            ],
-                                          ),
-                                          borderRadius: BorderRadius.circular(20),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: AppTheme.primary.withValues(
-                                                alpha: 0.3,
-                                              ),
-                                              blurRadius: 6,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ],
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(
-                                              Icons.qr_code_scanner_rounded,
-                                              size: 14,
-                                              color: Colors.white,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              'สแกน QR',
-                                              style: GoogleFonts.prompt(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.white,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-
-                                  // ── Complete button (in progress) ──
-                                  if (canComplete)
-                                    GestureDetector(
-                                      onTap: () =>
-                                          _showCompleteDialog(context, ref),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 5,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            colors: pastEndTime
-                                                ? [
-                                                    AppTheme.success,
-                                                    const Color(0xFF7DD9A0),
-                                                  ]
-                                                : [
-                                                    const Color(0xFF5B9CF6),
-                                                    const Color(0xFF7DB8F8),
-                                                  ],
-                                          ),
-                                          borderRadius: BorderRadius.circular(20),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color:
-                                                  (pastEndTime
-                                                          ? AppTheme.success
-                                                          : const Color(0xFF5B9CF6))
-                                                      .withValues(alpha: 0.3),
-                                              blurRadius: 6,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ],
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              pastEndTime
-                                                  ? Icons.check_circle_rounded
-                                                  : Icons.stop_circle_rounded,
-                                              size: 14,
-                                              color: Colors.white,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              pastEndTime ? 'รับผ้า' : 'เสร็จสิ้น',
-                                              style: GoogleFonts.prompt(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                                color: Colors.white,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ],
-                          ),
                         ],
                       ),
                     ),
-                  ),
-                ],
+
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    machineLabel,
+                                    style: GoogleFonts.prompt(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: isCancelled
+                                          ? AppTheme.neutral400
+                                          : AppTheme.textPrimary,
+                                      decoration: isCancelled
+                                          ? TextDecoration.lineThrough
+                                          : null,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 4),
+
+                            Row(
+                              children: [
+                                _buildBadge(
+                                  '$dayStr $dateStr',
+                                  isWasher
+                                      ? AppTheme.primary
+                                      : AppTheme.accentDark,
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 6),
+
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.access_time_rounded,
+                                  size: 14,
+                                  color: AppTheme.neutral400,
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  timeStr,
+                                  style: GoogleFonts.prompt(
+                                    fontSize: 12,
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Icon(
+                                  Icons.circle,
+                                  size: 4,
+                                  color: AppTheme.neutral400,
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  '${booking.durationMinutes} นาที',
+                                  style: GoogleFonts.prompt(
+                                    fontSize: 12,
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            const Spacer(),
+
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: color.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    _statusText(booking.status),
+                                    style: GoogleFonts.prompt(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: color,
+                                    ),
+                                  ),
+                                ),
+                                if (isCompleted) ...[
+                                  const SizedBox(width: 8),
+                                  Icon(
+                                    Icons.verified_rounded,
+                                    size: 16,
+                                    color: AppTheme.success,
+                                  ),
+                                ],
+                                const Spacer(),
+
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (isPending)
+                                      GestureDetector(
+                                        onTap: () =>
+                                            _showCancelDialog(context, ref),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 5,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.error.withValues(
+                                              alpha: 0.08,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            border: Border.all(
+                                              color: AppTheme.error.withValues(
+                                                alpha: 0.25,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.close_rounded,
+                                                size: 14,
+                                                color: AppTheme.error,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'ยกเลิก',
+                                                style: GoogleFonts.prompt(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppTheme.error,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+
+                                    if (canComplete)
+                                      GestureDetector(
+                                        onTap: () =>
+                                            _showCompleteDialog(context, ref),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 5,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: pastEndTime
+                                                  ? [
+                                                      AppTheme.success,
+                                                      const Color(0xFF7DD9A0),
+                                                    ]
+                                                  : [
+                                                      const Color(0xFF5B9CF6),
+                                                      const Color(0xFF7DB8F8),
+                                                    ],
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color:
+                                                    (pastEndTime
+                                                            ? AppTheme.success
+                                                            : const Color(
+                                                                0xFF5B9CF6,
+                                                              ))
+                                                        .withValues(
+                                                          alpha: 0.3,
+                                                        ),
+                                                blurRadius: 6,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                pastEndTime
+                                                    ? Icons.check_circle_rounded
+                                                    : Icons.stop_circle_rounded,
+                                                size: 14,
+                                                color: Colors.white,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                pastEndTime
+                                                    ? 'รับผ้า'
+                                                    : 'เสร็จสิ้น',
+                                                style: GoogleFonts.prompt(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1194,102 +1089,6 @@ class _BookingCard extends ConsumerWidget {
     );
   }
 
-  void _showCheckInDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.play_circle_filled_rounded,
-                  color: AppTheme.primary,
-                  size: 40,
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'เริ่มใช้งานเครื่อง?',
-                style: GoogleFonts.prompt(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'ยืนยันว่าคุณนำผ้าไปใส่เครื่องแล้ว\nสถานะจะเปลี่ยนเป็น "กำลังซัก"',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.prompt(
-                  fontSize: 14,
-                  color: AppTheme.textSecondary,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.textSecondary,
-                        side: const BorderSide(color: AppTheme.neutral200),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      child: Text(
-                        'ยังก่อน',
-                        style: GoogleFonts.prompt(fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        Navigator.pop(context);
-                        await ref
-                            .read(bookingProvider)
-                            .checkInBooking(booking.id);
-                        ref.invalidate(myBookingsProvider);
-                        ref.invalidate(activeBookingsProvider);
-                        ref.invalidate(machineProvider);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        elevation: 0,
-                      ),
-                      child: Text(
-                        'เริ่มใช้งาน',
-                        style: GoogleFonts.prompt(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   void _showCompleteDialog(BuildContext context, WidgetRef ref) {
     showDialog(

@@ -26,12 +26,10 @@ mixin _$Booking {
   String get userId => throw _privateConstructorUsedError;
   @JsonKey(name: 'machine_id')
   String get machineId => throw _privateConstructorUsedError;
-  @JsonKey(name: 'booking_date')
-  DateTime get bookingDate => throw _privateConstructorUsedError;
   @JsonKey(name: 'start_time')
-  String get startTime => throw _privateConstructorUsedError;
+  DateTime get startTime => throw _privateConstructorUsedError;
   @JsonKey(name: 'end_time')
-  String get endTime => throw _privateConstructorUsedError;
+  DateTime get endTime => throw _privateConstructorUsedError;
   @JsonKey(name: 'duration_minutes')
   int get durationMinutes => throw _privateConstructorUsedError;
   @JsonKey(name: 'cycle_type')
@@ -61,9 +59,8 @@ abstract class $BookingCopyWith<$Res> {
     String id,
     @JsonKey(name: 'user_id') String userId,
     @JsonKey(name: 'machine_id') String machineId,
-    @JsonKey(name: 'booking_date') DateTime bookingDate,
-    @JsonKey(name: 'start_time') String startTime,
-    @JsonKey(name: 'end_time') String endTime,
+    @JsonKey(name: 'start_time') DateTime startTime,
+    @JsonKey(name: 'end_time') DateTime endTime,
     @JsonKey(name: 'duration_minutes') int durationMinutes,
     @JsonKey(name: 'cycle_type') String? cycleType,
     BookingStatus status,
@@ -91,7 +88,6 @@ class _$BookingCopyWithImpl<$Res, $Val extends Booking>
     Object? id = null,
     Object? userId = null,
     Object? machineId = null,
-    Object? bookingDate = null,
     Object? startTime = null,
     Object? endTime = null,
     Object? durationMinutes = null,
@@ -115,18 +111,14 @@ class _$BookingCopyWithImpl<$Res, $Val extends Booking>
                 ? _value.machineId
                 : machineId // ignore: cast_nullable_to_non_nullable
                       as String,
-            bookingDate: null == bookingDate
-                ? _value.bookingDate
-                : bookingDate // ignore: cast_nullable_to_non_nullable
-                      as DateTime,
             startTime: null == startTime
                 ? _value.startTime
                 : startTime // ignore: cast_nullable_to_non_nullable
-                      as String,
+                      as DateTime,
             endTime: null == endTime
                 ? _value.endTime
                 : endTime // ignore: cast_nullable_to_non_nullable
-                      as String,
+                      as DateTime,
             durationMinutes: null == durationMinutes
                 ? _value.durationMinutes
                 : durationMinutes // ignore: cast_nullable_to_non_nullable
@@ -169,9 +161,8 @@ abstract class _$$BookingImplCopyWith<$Res> implements $BookingCopyWith<$Res> {
     String id,
     @JsonKey(name: 'user_id') String userId,
     @JsonKey(name: 'machine_id') String machineId,
-    @JsonKey(name: 'booking_date') DateTime bookingDate,
-    @JsonKey(name: 'start_time') String startTime,
-    @JsonKey(name: 'end_time') String endTime,
+    @JsonKey(name: 'start_time') DateTime startTime,
+    @JsonKey(name: 'end_time') DateTime endTime,
     @JsonKey(name: 'duration_minutes') int durationMinutes,
     @JsonKey(name: 'cycle_type') String? cycleType,
     BookingStatus status,
@@ -198,7 +189,6 @@ class __$$BookingImplCopyWithImpl<$Res>
     Object? id = null,
     Object? userId = null,
     Object? machineId = null,
-    Object? bookingDate = null,
     Object? startTime = null,
     Object? endTime = null,
     Object? durationMinutes = null,
@@ -222,18 +212,14 @@ class __$$BookingImplCopyWithImpl<$Res>
             ? _value.machineId
             : machineId // ignore: cast_nullable_to_non_nullable
                   as String,
-        bookingDate: null == bookingDate
-            ? _value.bookingDate
-            : bookingDate // ignore: cast_nullable_to_non_nullable
-                  as DateTime,
         startTime: null == startTime
             ? _value.startTime
             : startTime // ignore: cast_nullable_to_non_nullable
-                  as String,
+                  as DateTime,
         endTime: null == endTime
             ? _value.endTime
             : endTime // ignore: cast_nullable_to_non_nullable
-                  as String,
+                  as DateTime,
         durationMinutes: null == durationMinutes
             ? _value.durationMinutes
             : durationMinutes // ignore: cast_nullable_to_non_nullable
@@ -270,7 +256,6 @@ class _$BookingImpl implements _Booking {
     required this.id,
     @JsonKey(name: 'user_id') required this.userId,
     @JsonKey(name: 'machine_id') required this.machineId,
-    @JsonKey(name: 'booking_date') required this.bookingDate,
     @JsonKey(name: 'start_time') required this.startTime,
     @JsonKey(name: 'end_time') required this.endTime,
     @JsonKey(name: 'duration_minutes') required this.durationMinutes,
@@ -293,14 +278,11 @@ class _$BookingImpl implements _Booking {
   @JsonKey(name: 'machine_id')
   final String machineId;
   @override
-  @JsonKey(name: 'booking_date')
-  final DateTime bookingDate;
-  @override
   @JsonKey(name: 'start_time')
-  final String startTime;
+  final DateTime startTime;
   @override
   @JsonKey(name: 'end_time')
-  final String endTime;
+  final DateTime endTime;
   @override
   @JsonKey(name: 'duration_minutes')
   final int durationMinutes;
@@ -321,7 +303,7 @@ class _$BookingImpl implements _Booking {
 
   @override
   String toString() {
-    return 'Booking(id: $id, userId: $userId, machineId: $machineId, bookingDate: $bookingDate, startTime: $startTime, endTime: $endTime, durationMinutes: $durationMinutes, cycleType: $cycleType, status: $status, checkedInAt: $checkedInAt, completedAt: $completedAt, notes: $notes)';
+    return 'Booking(id: $id, userId: $userId, machineId: $machineId, startTime: $startTime, endTime: $endTime, durationMinutes: $durationMinutes, cycleType: $cycleType, status: $status, checkedInAt: $checkedInAt, completedAt: $completedAt, notes: $notes)';
   }
 
   @override
@@ -333,8 +315,6 @@ class _$BookingImpl implements _Booking {
             (identical(other.userId, userId) || other.userId == userId) &&
             (identical(other.machineId, machineId) ||
                 other.machineId == machineId) &&
-            (identical(other.bookingDate, bookingDate) ||
-                other.bookingDate == bookingDate) &&
             (identical(other.startTime, startTime) ||
                 other.startTime == startTime) &&
             (identical(other.endTime, endTime) || other.endTime == endTime) &&
@@ -357,7 +337,6 @@ class _$BookingImpl implements _Booking {
     id,
     userId,
     machineId,
-    bookingDate,
     startTime,
     endTime,
     durationMinutes,
@@ -387,9 +366,8 @@ abstract class _Booking implements Booking {
     required final String id,
     @JsonKey(name: 'user_id') required final String userId,
     @JsonKey(name: 'machine_id') required final String machineId,
-    @JsonKey(name: 'booking_date') required final DateTime bookingDate,
-    @JsonKey(name: 'start_time') required final String startTime,
-    @JsonKey(name: 'end_time') required final String endTime,
+    @JsonKey(name: 'start_time') required final DateTime startTime,
+    @JsonKey(name: 'end_time') required final DateTime endTime,
     @JsonKey(name: 'duration_minutes') required final int durationMinutes,
     @JsonKey(name: 'cycle_type') final String? cycleType,
     final BookingStatus status,
@@ -409,14 +387,11 @@ abstract class _Booking implements Booking {
   @JsonKey(name: 'machine_id')
   String get machineId;
   @override
-  @JsonKey(name: 'booking_date')
-  DateTime get bookingDate;
-  @override
   @JsonKey(name: 'start_time')
-  String get startTime;
+  DateTime get startTime;
   @override
   @JsonKey(name: 'end_time')
-  String get endTime;
+  DateTime get endTime;
   @override
   @JsonKey(name: 'duration_minutes')
   int get durationMinutes;

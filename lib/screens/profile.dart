@@ -8,6 +8,8 @@ import 'package:laundry_app/screens/login.dart';
 import 'package:laundry_app/screens/notifications.dart';
 import 'package:laundry_app/screens/my_bookings.dart';
 import 'package:laundry_app/screens/report_machine.dart';
+import 'package:laundry_app/screens/help.dart';
+import 'package:laundry_app/screens/privacy.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -98,28 +100,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       backgroundColor: AppTheme.background,
       body: CustomScrollView(
         slivers: [
-          // ── Profile Header ──
           SliverToBoxAdapter(
             child: _buildProfileHeader(fullName, email),
           ),
 
-          // ── Edit Profile Section ──
           if (_isEditing)
             SliverToBoxAdapter(
               child: _buildEditForm(),
             ),
 
-          // ── Menu Items ──
           SliverToBoxAdapter(
             child: _buildMenuSection(),
           ),
 
-          // ── More Section ──
           SliverToBoxAdapter(
             child: _buildMoreSection(),
           ),
 
-          // ── Logout ──
           SliverToBoxAdapter(
             child: _buildLogout(),
           ),
@@ -132,7 +129,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  // ── Profile Header ──
   Widget _buildProfileHeader(String name, String email) {
     return Container(
       padding: EdgeInsets.only(
@@ -154,7 +150,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ),
       child: Column(
         children: [
-          // Back button row (if pushed)
           if (widget.showBackButton)
             Align(
               alignment: Alignment.centerLeft,
@@ -176,10 +171,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           if (widget.showBackButton) const SizedBox(height: 8),
 
-          // Avatar + info
           Row(
             children: [
-              // Avatar
               Container(
                 width: 72,
                 height: 72,
@@ -203,7 +196,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
               ),
               const SizedBox(width: 16),
-              // Name + email
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,7 +223,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ],
                 ),
               ),
-              // Edit button
               GestureDetector(
                 onTap: () {
                   if (_isEditing) {
@@ -269,7 +260,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  // ── Edit Form (shown when editing) ──
   Widget _buildEditForm() {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -363,7 +353,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  // ── Main Menu Section ──
   Widget _buildMenuSection() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
@@ -412,7 +401,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  // ── More Section ──
   Widget _buildMoreSection() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
@@ -458,13 +446,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 _buildCompactMenuItem(
                   icon: Icons.help_outline_rounded,
                   title: 'ช่วยเหลือ',
-                  onTap: () {},
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const HelpScreen(),
+                    ),
+                  ),
                   showDivider: true,
                 ),
                 _buildCompactMenuItem(
                   icon: Icons.privacy_tip_outlined,
                   title: 'นโยบายความเป็นส่วนตัว',
-                  onTap: () {},
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const PrivacyPolicyScreen(),
+                    ),
+                  ),
                   showDivider: false,
                 ),
               ],
@@ -475,7 +473,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  // ── Logout ──
   Widget _buildLogout() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
@@ -613,7 +610,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  // ── Reusable Menu Item (large) ──
   Widget _buildMenuItem({
     required IconData icon,
     required String title,
@@ -681,7 +677,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  // ── Reusable Compact Menu Item (for More section) ──
   Widget _buildCompactMenuItem({
     required IconData icon,
     required String title,

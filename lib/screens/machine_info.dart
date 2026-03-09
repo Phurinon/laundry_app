@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:laundry_app/models/machine.dart';
 import 'package:laundry_app/models/theme.dart';
@@ -8,6 +9,8 @@ import 'package:laundry_app/providers/machine_provider.dart';
 import 'package:laundry_app/providers/machine_signal_provider.dart';
 import 'package:laundry_app/screens/components/machine_illustration.dart';
 import 'package:laundry_app/screens/report_machine.dart';
+import 'package:laundry_app/models/booking.dart';
+import 'package:intl/intl.dart';
 
 class MachineInfoScreen extends ConsumerStatefulWidget {
   final Machine machine;
@@ -48,572 +51,678 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen>
 
   bool get _isWasher => widget.machine.machineType == MachineType.washer;
   Color get _machineColor => _isWasher ? AppTheme.primary : AppTheme.accent;
-  String get _typeName => _isWasher ? 'เครื่องซักผ้า' : 'เครื่องอบผ้า';
-  String get _duration => _isWasher ? '~40 นาที' : '~50 นาที';
+  String get _duration => _isWasher ? '40 นาที' : '50 นาที';
 
   @override
   Widget build(BuildContext context) {
-    final machine = widget.machine;
-    final statusColor = _getStatusColor(machine.status);
-    final signalState = ref.watch(machineSignalProvider);
+    final machinesAsync = ref.watch(machineProvider);
+    final activeBookingsAsync = ref.watch(activeBookingsProvider);
+    final rawSignalState = ref.watch(machineSignalProvider);
+
+    final machine = machinesAsync.maybeWhen(
+      data: (list) => list.firstWhere(
+        (m) => m.id == widget.machine.id,
+        orElse: () => widget.machine,
+      ),
+      orElse: () => widget.machine,
+    );
+
+    final signalState = rawSignalState.machineId == machine.id
+        ? rawSignalState
+        : MachineSignalState(status: MachineWorkStatus.idle);
+
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    final now = DateTime.now();
+    final myActiveBooking = activeBookingsAsync.maybeWhen(
+      data: (bookings) {
+        final myBookings = bookings
+            .where(
+              (b) => b.machineId == machine.id && b.userId == currentUserId,
+            )
+            .toList();
+
+        if (myBookings.isEmpty) return null;
+
+        myBookings.sort((a, b) => a.startTime.compareTo(b.startTime));
+
+        try {
+          return myBookings.firstWhere(
+            (b) => b.status == BookingStatus.inProgress,
+          );
+        } catch (_) {}
+
+        return myBookings.first;
+      },
+      orElse: () => null,
+    );
+
+    final isBooked = activeBookingsAsync.maybeWhen(
+      data: (bookings) => bookings.any((b) => b.machineId == machine.id),
+      orElse: () => false,
+    );
+
+    final isActuallyAvailable =
+        machine.status == MachineStatus.available && !isBooked;
+
+    final canBookNext = machine.status != MachineStatus.maintenance;
+
+    final isReadyToStart =
+        myActiveBooking != null &&
+        (myActiveBooking.status == BookingStatus.pending ||
+            myActiveBooking.status == BookingStatus.checkedIn) &&
+        now.isAfter(
+          myActiveBooking.startTime.toLocal().subtract(
+            const Duration(minutes: 15),
+          ),
+        );
+
+    final canStartNow =
+        myActiveBooking != null &&
+        (myActiveBooking.status == BookingStatus.pending ||
+            myActiveBooking.status == BookingStatus.checkedIn) &&
+        isReadyToStart;
+
+    Color statusColor;
+    String statusText;
+
+    if (signalState.status != MachineWorkStatus.idle) {
+      if (signalState.status == MachineWorkStatus.finished) {
+        statusText = 'ซักผ้าเสร็จแล้ว!';
+        statusColor = AppTheme.success;
+      } else {
+        statusText = 'ผ้ากำลัง...${signalState.status.name}';
+        statusColor = _machineColor;
+      }
+    } else if (myActiveBooking != null) {
+      statusColor = isReadyToStart ? _machineColor : AppTheme.warning;
+      if (myActiveBooking.status == BookingStatus.inProgress) {
+        statusText = 'ผ้าคุณกำลังซักอยู่';
+      } else if (isReadyToStart) {
+        statusText = 'ถึงคิวของคุณแล้ว';
+      } else {
+        final timeStr = DateFormat(
+          'HH:mm',
+        ).format(myActiveBooking.startTime.toLocal());
+        statusText = 'คุณมีการจองรอบ $timeStr น.';
+      }
+    } else {
+      statusColor = isActuallyAvailable
+          ? AppTheme.success
+          : (machine.status == MachineStatus.available
+                ? AppTheme.error
+                : _getStatusColor(machine.status));
+
+      statusText = isActuallyAvailable
+          ? 'พร้อมใช้งาน'
+          : (isBooked
+                ? 'ไม่ว่าง (ติดจอง/กำลังซัก)'
+                : _getStatusText(machine.status));
+    }
 
     return Scaffold(
       backgroundColor: AppTheme.background,
-      body: CustomScrollView(
-        slivers: [
-          // ── Hero Header ──
-          SliverAppBar(
-            expandedHeight: 280,
-            pinned: true,
-            backgroundColor: _machineColor,
-            iconTheme: const IconThemeData(color: Colors.white),
-            actions: [
-              IconButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          ReportMachineScreen(machine: widget.machine),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.flag_rounded),
-                tooltip: 'รายงานปัญหา',
-              ),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      _machineColor,
-                      _machineColor.withValues(alpha: 0.7),
-                      _isWasher ? AppTheme.primaryDark : AppTheme.accentDark,
-                    ],
-                  ),
-                ),
-                child: SafeArea(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 30),
-                      // Machine illustration with glow
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withValues(alpha: 0.15),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.white.withValues(alpha: 0.1),
-                              blurRadius: 40,
-                              spreadRadius: 10,
-                            ),
-                          ],
-                        ),
-                        child: MachineIllustration(
-                          machineType: machine.machineType,
-                          size: 110,
-                          primaryColor: Colors.white,
-                          secondaryColor: Colors.white.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      // Machine number
-                      Text(
-                        'เครื่อง ${machine.machineNumber}',
-                        style: GoogleFonts.prompt(
-                          fontSize: 26,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      // Type label
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          _typeName,
-                          style: GoogleFonts.prompt(
-                            fontSize: 13,
-                            color: Colors.white.withValues(alpha: 0.95),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // ── Body Content ──
-          SliverToBoxAdapter(
-            child: FadeTransition(
-              opacity: _fadeIn,
-              child: SlideTransition(
-                position: _slideUp,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-                  child: Column(
-                    children: [
-                      // ── Status Card ──
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: statusColor.withValues(alpha: 0.2),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: statusColor.withValues(alpha: 0.12),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                _getStatusIcon(machine.status),
-                                color: statusColor,
-                                size: 28,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'สถานะเครื่อง',
-                                    style: GoogleFonts.prompt(
-                                      fontSize: 12,
-                                      color: AppTheme.textSecondary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    _getStatusText(machine.status),
-                                    style: GoogleFonts.prompt(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: statusColor,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            // Animated dot
-                            if (machine.status == MachineStatus.available)
-                              Container(
-                                width: 12,
-                                height: 12,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: statusColor,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: statusColor.withValues(alpha: 0.4),
-                                      blurRadius: 8,
-                                      spreadRadius: 2,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // ── Info List ──
-                      _buildInfoTile(
-                        icon: Icons.category_rounded,
-                        label: 'ประเภท',
-                        value: _isWasher ? 'ซักผ้า' : 'อบผ้า',
-                        color: _machineColor,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildInfoTile(
-                        icon: Icons.scale_rounded,
-                        label: 'ขนาด',
-                        value: '${machine.capacity} กก.',
-                        color: AppTheme.success,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildInfoTile(
-                        icon: Icons.payments_rounded,
-                        label: 'ราคา',
-                        value: '${machine.price} บาท',
-                        color: AppTheme.warning,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildInfoTile(
-                        icon: Icons.timer_outlined,
-                        label: 'ระยะเวลา',
-                        value: _duration,
-                        color: AppTheme.accentDark,
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // ── Simulation Card ──
-                      _buildSimulationCard(signalState),
-
-                      const SizedBox(height: 32),
-
-                      // ── Booking Button ──
-                      SizedBox(
-                        width: double.infinity,
-                        height: 58,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(18),
-                            gradient: machine.status == MachineStatus.available
-                                ? LinearGradient(
-                                    colors: [
-                                      _machineColor,
-                                      _isWasher
-                                          ? AppTheme.primaryDark
-                                          : AppTheme.accentDark,
-                                    ],
-                                  )
-                                : null,
-                            color: machine.status != MachineStatus.available
-                                ? AppTheme.neutral200
-                                : null,
-                            boxShadow: machine.status == MachineStatus.available
-                                ? [
-                                    BoxShadow(
-                                      color: _machineColor.withValues(
-                                        alpha: 0.35,
-                                      ),
-                                      blurRadius: 16,
-                                      offset: const Offset(0, 6),
-                                    ),
-                                  ]
-                                : null,
-                          ),
-                          child: ElevatedButton(
-                            onPressed:
-                                machine.status == MachineStatus.available &&
-                                    !_isBooking
-                                ? _handleBooking
-                                : null,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              disabledBackgroundColor: Colors.transparent,
-                              shadowColor: Colors.transparent,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                            ),
-                            child: _isBooking
-                                ? const SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2.5,
-                                    ),
-                                  )
-                                : Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        machine.status ==
-                                                MachineStatus.available
-                                            ? Icons.calendar_month_rounded
-                                            : Icons.block_rounded,
-                                        color:
-                                            machine.status ==
-                                                MachineStatus.available
-                                            ? Colors.white
-                                            : AppTheme.neutral400,
-                                        size: 22,
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Text(
-                                        machine.status ==
-                                                MachineStatus.available
-                                            ? 'จองคิวเลย'
-                                            : _getStatusText(machine.status),
-                                        style: GoogleFonts.prompt(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color:
-                                              machine.status ==
-                                                  MachineStatus.available
-                                              ? Colors.white
-                                              : AppTheme.neutral400,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Simulation Card ──
-  Widget _buildSimulationCard(MachineSignalState signalState) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      body: Stack(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.monitor_heart_rounded, color: _machineColor),
-                  const SizedBox(width: 8),
-                  Text(
-                    'จำลองการทำงาน',
-                    style: GoogleFonts.prompt(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
+          CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                expandedHeight: 320,
+                pinned: true,
+                stretch: true,
+                backgroundColor: _machineColor,
+                elevation: 0,
+                leading: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: CircleAvatar(
+                    backgroundColor: Colors.black.withValues(alpha: 0.2),
+                    child: const BackButton(color: Colors.white),
+                  ),
+                ),
+                actions: [
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: CircleAvatar(
+                      backgroundColor: Colors.black.withValues(alpha: 0.2),
+                      child: IconButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  ReportMachineScreen(machine: machine),
+                            ),
+                          );
+                        },
+                        icon: const Icon(
+                          Icons.flag_rounded,
+                          color: Colors.white,
+                        ),
+                        tooltip: 'รายงานปัญหา',
+                      ),
                     ),
                   ),
                 ],
-              ),
-              if (signalState.status != MachineWorkStatus.idle)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _machineColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    signalState.status.name,
-                    style: GoogleFonts.prompt(
-                      fontSize: 12,
-                      color: _machineColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.background,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.neutral200),
-                  ),
-                  child: Row(
+                flexibleSpace: FlexibleSpaceBar(
+                  stretchModes: const [
+                    StretchMode.zoomBackground,
+                    StretchMode.blurBackground,
+                  ],
+                  background: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      const Icon(Icons.electrical_services_rounded, size: 20, color: AppTheme.warning),
-                      const SizedBox(width: 8),
-                      Expanded(
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              _machineColor,
+                              _machineColor.withValues(alpha: 0.8),
+                              _isWasher
+                                  ? AppTheme.primaryDark
+                                  : AppTheme.accentDark,
+                            ],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        right: -50,
+                        top: -50,
+                        child: CircleAvatar(
+                          radius: 120,
+                          backgroundColor: Colors.white.withValues(alpha: 0.05),
+                        ),
+                      ),
+                      SafeArea(
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(
-                              'กระแสไฟฟ้า',
-                              style: GoogleFonts.prompt(
-                                fontSize: 10,
-                                color: AppTheme.textSecondary,
-                              ),
+                            const SizedBox(height: 20),
+                            TweenAnimationBuilder<double>(
+                              tween: Tween(begin: 1.0, end: 1.1),
+                              duration: const Duration(seconds: 2),
+                              curve: Curves.easeInOutSine,
+                              builder: (context, value, child) {
+                                return Transform.scale(
+                                  scale: value,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(28),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.white.withValues(
+                                        alpha: 0.15,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.2 * value,
+                                          ),
+                                          blurRadius: 40 * value,
+                                          spreadRadius: 5,
+                                        ),
+                                      ],
+                                    ),
+                                    child: MachineIllustration(
+                                      machineType: machine.machineType,
+                                      size: 110,
+                                      primaryColor: Colors.white,
+                                      secondaryColor: Colors.white.withValues(
+                                        alpha: 0.3,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
+                            const SizedBox(height: 20),
                             Text(
-                              '${signalState.currentAmps.toStringAsFixed(2)} A',
+                              'เครื่อง ${machine.machineNumber}',
                               style: GoogleFonts.prompt(
-                                fontSize: 14,
+                                fontSize: 32,
                                 fontWeight: FontWeight.bold,
-                                color: AppTheme.textPrimary,
+                                color: Colors.white,
+                                letterSpacing: 1.0,
                               ),
                             ),
                           ],
+                        ),
+                      ),
+                      Positioned(
+                        bottom: -1,
+                        left: 0,
+                        right: 0,
+                        child: Container(
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: AppTheme.background,
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(30),
+                            ),
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.background,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.neutral200),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.timer_outlined, size: 20, color: AppTheme.success),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'สถานะ',
-                              style: GoogleFonts.prompt(
-                                fontSize: 10,
-                                color: AppTheme.textSecondary,
-                              ),
+
+              SliverToBoxAdapter(
+                child: FadeTransition(
+                  opacity: _fadeIn,
+                  child: SlideTransition(
+                    position: _slideUp,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 120),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildStatusTile(
+                            statusText,
+                            statusColor,
+                            isActuallyAvailable,
+                            myActiveBooking,
+                            signalState.status,
+                          ),
+
+                          const SizedBox(height: 32),
+
+                          Text(
+                            'ข้อมูลเครื่อง',
+                            style: GoogleFonts.prompt(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.textPrimary,
                             ),
-                            Text(
-                              signalState.status == MachineWorkStatus.idle ? '-' : 'กำลังทำงาน',
-                              style: GoogleFonts.prompt(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.textPrimary,
+                          ),
+                          const SizedBox(height: 16),
+
+                          GridView.count(
+                            padding: EdgeInsets.zero,
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            crossAxisCount: 2,
+                            mainAxisSpacing: 16,
+                            crossAxisSpacing: 16,
+                            childAspectRatio: 1.5,
+                            children: [
+                              _buildGridItem(
+                                icon: Icons.scale_rounded,
+                                label: 'ความจุ',
+                                value: '${machine.capacity} กก.',
+                                color: AppTheme.success,
                               ),
-                            ),
-                          ],
-                        ),
+                              _buildGridItem(
+                                icon: Icons.payments_rounded,
+                                label: 'ราคา',
+                                value: '${machine.price} บาท',
+                                color: AppTheme.warning,
+                              ),
+                              _buildGridItem(
+                                icon: Icons.timer_outlined,
+                                label: 'เวลา',
+                                value: _duration,
+                                color: AppTheme.primary,
+                              ),
+                              _buildGridItem(
+                                icon: Icons.category_rounded,
+                                label: 'ประเภท',
+                                value: _isWasher ? 'ซักผ้า' : 'อบผ้า',
+                                color: AppTheme.accent,
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 32),
+
+                          _buildSimulationCard(signalState),
+
+                          const SizedBox(height: 24),
+                          _buildUpcomingQueue(machine.id),
+
+                          const SizedBox(
+                            height: 100,
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: signalState.status == MachineWorkStatus.idle
-                      ? () => ref.read(machineSignalProvider.notifier).startMockWashing()
-                      : null,
-                  icon: const Icon(Icons.play_arrow_rounded, size: 20),
-                  label: Text(
-                    'เริ่มจำลอง',
-                    style: GoogleFonts.prompt(fontWeight: FontWeight.bold),
+
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppTheme.background.withValues(alpha: 0.0),
+                    AppTheme.background.withValues(alpha: 0.9),
+                    AppTheme.background,
+                  ],
+                ),
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                height: 58,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: canBookNext
+                        ? LinearGradient(
+                            colors: [
+                              _machineColor.withValues(
+                                alpha: isActuallyAvailable ? 1.0 : 0.8,
+                              ),
+                              (_isWasher
+                                      ? AppTheme.primaryDark
+                                      : AppTheme.accentDark)
+                                  .withValues(
+                                    alpha: isActuallyAvailable ? 1.0 : 0.8,
+                                  ),
+                            ],
+                          )
+                        : null,
+                    color: !canBookNext ? AppTheme.neutral200 : null,
+                    boxShadow: canBookNext
+                        ? [
+                            BoxShadow(
+                              color: _machineColor.withValues(alpha: 0.35),
+                              blurRadius: 16,
+                              offset: const Offset(0, 8),
+                            ),
+                          ]
+                        : null,
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _machineColor,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: AppTheme.neutral200,
-                    disabledForegroundColor: AppTheme.neutral400,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  child: ElevatedButton(
+                    onPressed:
+                        (canBookNext &&
+                            !_isBooking &&
+                            signalState.status == MachineWorkStatus.idle)
+                        ? (canStartNow
+                              ? () => _handleCheckIn(myActiveBooking)
+                              : () => _handleBooking(machine))
+                        : (signalState.status == MachineWorkStatus.finished
+                              ? () => ref
+                                    .read(machineSignalProvider.notifier)
+                                    .resetWork()
+                              : null),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      disabledBackgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: _isBooking
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.5,
+                            ),
+                          )
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                signalState.status == MachineWorkStatus.finished
+                                    ? Icons.check_circle_outline_rounded
+                                    : (canStartNow &&
+                                              signalState.status ==
+                                                  MachineWorkStatus.idle
+                                          ? Icons.qr_code_scanner_rounded
+                                          : (isActuallyAvailable
+                                                ? Icons
+                                                      .add_circle_outline_rounded
+                                                : (signalState.status !=
+                                                          MachineWorkStatus.idle
+                                                      ? Icons
+                                                            .hourglass_bottom_rounded
+                                                      : Icons.redo_rounded))),
+                                color:
+                                    (canBookNext ||
+                                        signalState.status ==
+                                            MachineWorkStatus.finished)
+                                    ? Colors.white
+                                    : AppTheme.neutral400,
+                                size: 22,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                signalState.status == MachineWorkStatus.finished
+                                    ? 'เสร็จสิ้น (กดเพื่อรับผ้า)'
+                                    : (canStartNow &&
+                                              signalState.status ==
+                                                  MachineWorkStatus.idle
+                                          ? 'สแกน QR เพื่อเริ่มซัก'
+                                          : (isActuallyAvailable
+                                                ? 'จองคิวเลย'
+                                                : (canBookNext
+                                                      ? 'จองคิวต่อไป'
+                                                      : statusText))),
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.prompt(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color:
+                                      (canBookNext ||
+                                          signalState.status ==
+                                              MachineWorkStatus.finished)
+                                      ? Colors.white
+                                      : AppTheme.neutral400,
+                                ),
+                              ),
+                            ],
+                          ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: signalState.status != MachineWorkStatus.idle
-                      ? () => ref.read(machineSignalProvider.notifier).resetWork()
-                      : null,
-                  icon: const Icon(Icons.refresh_rounded, size: 20),
-                  label: Text(
-                    'รีเซ็ต',
-                    style: GoogleFonts.prompt(fontWeight: FontWeight.bold),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.error,
-                    side: BorderSide(
-                      color: signalState.status != MachineWorkStatus.idle
-                          ? AppTheme.error
-                          : AppTheme.neutral200,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  // ── Info Tile (row item) ──
-  Widget _buildInfoTile({
+  Widget _buildStatusTile(
+    String text,
+    Color color,
+    bool isAvailable,
+    Booking? myBooking,
+    MachineWorkStatus workStatus,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'สถานะการทำงาน',
+                  style: GoogleFonts.prompt(
+                    fontSize: 13,
+                    color: AppTheme.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  text,
+                  style: GoogleFonts.prompt(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+                if (myBooking != null &&
+                    workStatus == MachineWorkStatus.idle &&
+                    myBooking.status != BookingStatus.inProgress) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: color.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.lock_person_rounded,
+                          size: 14,
+                          color: color,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'ล็อคคิวเฉพาะคุณ (กดเพื่อเริ่ม)',
+                          style: GoogleFonts.prompt(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: color,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (workStatus != MachineWorkStatus.idle) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        workStatus == MachineWorkStatus.finished
+                            ? Icon(
+                                Icons.check_circle_rounded,
+                                size: 14,
+                                color: color,
+                              )
+                            : SizedBox(
+                                width: 10,
+                                height: 10,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    color,
+                                  ),
+                                ),
+                              ),
+                        const SizedBox(width: 8),
+                        Text(
+                          workStatus == MachineWorkStatus.finished
+                              ? 'รอรับผ้าคืน'
+                              : 'ระบบกำลังทำงาน...',
+                          style: GoogleFonts.prompt(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: color,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (isAvailable)
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.0, end: 1.0),
+              duration: const Duration(seconds: 1),
+              curve: Curves.elasticOut,
+              builder: (context, value, child) {
+                return Transform.scale(
+                  scale: value,
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: AppTheme.success.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.check_rounded,
+                      color: AppTheme.success,
+                      size: 28,
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGridItem({
     required IconData icon,
     required String label,
     required String value,
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.neutral100),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 22),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              label,
-              style: GoogleFonts.prompt(
-                fontSize: 14,
-                color: AppTheme.textSecondary,
+          Row(
+            children: [
+              Icon(icon, color: color, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: GoogleFonts.prompt(
+                  fontSize: 12,
+                  color: AppTheme.textSecondary,
+                ),
               ),
-            ),
+            ],
           ),
+          const SizedBox(height: 6),
           Text(
             value,
             style: GoogleFonts.prompt(
@@ -627,20 +736,231 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen>
     );
   }
 
-  Future<void> _handleBooking() async {
-    final now = DateTime.now();
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(
-        now.add(const Duration(minutes: 5)),
+  Widget _buildSimulationCard(MachineSignalState signalState) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppTheme.neutral100),
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _machineColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.analytics_rounded,
+                      color: _machineColor,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Real-time Sensor',
+                    style: GoogleFonts.prompt(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              if (signalState.status != MachineWorkStatus.idle)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.success.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    signalState.status == MachineWorkStatus.finished
+                        ? 'เสร็จสิ้น'
+                        : 'กำลังทำงาน',
+                    style: GoogleFonts.prompt(
+                      fontSize: 10,
+                      color: AppTheme.success,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: _buildSensorTile(
+                  'Amperage',
+                  '${signalState.currentAmps.toStringAsFixed(2)} A',
+                  Icons.electrical_services_rounded,
+                  AppTheme.warning,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildSensorTile(
+                  'Power',
+                  '${(signalState.currentAmps * 220).toStringAsFixed(0)} W',
+                  Icons.bolt_rounded,
+                  AppTheme.primary,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSensorTile(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.background,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.neutral100),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.prompt(
+                  fontSize: 10,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+              Text(
+                value,
+                style: GoogleFonts.prompt(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleCheckIn(Booking booking) async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('สแกน QR สำเร็จ (จำลอง)', style: GoogleFonts.prompt()),
+        content: Text(
+          'ระบบจำลองการสแกน QR สำเร็จแล้ว\nกดเพื่อเริ่มการทำงานของเครื่องและเซ็นเซอร์',
+          style: GoogleFonts.prompt(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('ยกเลิก', style: GoogleFonts.prompt()),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              setState(() => _isBooking = true);
+              try {
+                await ref.read(bookingProvider).checkInBooking(booking.id);
+
+                ref
+                    .read(machineSignalProvider.notifier)
+                    .startMockWashing(
+                      machineId: widget.machine.id,
+                      bookingId: booking.id,
+                    );
+
+                ref.invalidate(myBookingsProvider);
+                ref.invalidate(activeBookingsProvider);
+                ref.invalidate(machineProvider);
+              } finally {
+                if (mounted) setState(() => _isBooking = false);
+              }
+            },
+            child: Text('เริ่มใช้งาน', style: GoogleFonts.prompt()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleBooking(Machine machine) async {
+    final now = DateTime.now();
+    final nowUtc = now.toUtc();
+
+    DateTime suggestedStartTime = now.add(const Duration(minutes: 5));
+
+    final activeBookingsAsync = ref.read(activeBookingsProvider);
+    activeBookingsAsync.whenData((bookings) {
+      final machineBookings = bookings
+          .where((b) => b.machineId == machine.id)
+          .toList();
+      if (machineBookings.isNotEmpty) {
+        machineBookings.sort((a, b) => b.endTime.compareTo(a.endTime));
+        final latestBooking = machineBookings.first;
+
+        if (latestBooking.endTime.isAfter(nowUtc)) {
+          suggestedStartTime = latestBooking.endTime.toLocal().add(
+            const Duration(minutes: 2),
+          );
+        }
+      }
+    });
+
+    final selectedDate = await showDatePicker(
+      context: context,
+      initialDate: suggestedStartTime,
+      firstDate: now.subtract(const Duration(days: 0)),
+      lastDate: now.add(const Duration(days: 7)),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
-              primary: AppTheme.primary,
-              onPrimary: AppTheme.surface,
-              surface: AppTheme.surface,
+              primary: _machineColor,
+              onSurface: AppTheme.textPrimary,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (selectedDate == null || !mounted) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(suggestedStartTime),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: _machineColor,
               onSurface: AppTheme.textPrimary,
             ),
           ),
@@ -652,26 +972,26 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen>
     if (time == null || !mounted) return;
 
     final selectedDateTime = DateTime(
-      now.year,
-      now.month,
-      now.day,
+      selectedDate.year,
+      selectedDate.month,
+      selectedDate.day,
       time.hour,
       time.minute,
     );
 
-    if (selectedDateTime.isBefore(now)) {
+    if (selectedDateTime.isBefore(now.subtract(const Duration(minutes: 1)))) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             'ไม่สามารถจองเวลาย้อนหลังได้',
             style: GoogleFonts.prompt(),
           ),
+          backgroundColor: AppTheme.error,
         ),
       );
       return;
     }
 
-    // ── Check time conflict before confirming ──
     if (!mounted) return;
     setState(() => _isBooking = true);
 
@@ -686,7 +1006,6 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen>
             durationMinutes: durationMinutes,
           );
     } catch (_) {
-      // If check fails, let the booking proceed and rely on server-side validation
     } finally {
       if (mounted) setState(() => _isBooking = false);
     }
@@ -827,11 +1146,42 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen>
               ),
               child: Column(
                 children: [
-                  _buildDialogRow('เครื่อง', widget.machine.machineNumber),
+                  _buildDialogRow('เครื่อง', machine.machineNumber),
                   const SizedBox(height: 8),
                   _buildDialogRow('เวลา', time.format(context)),
                   const SizedBox(height: 8),
-                  _buildDialogRow('ราคา', '${widget.machine.price} บาท'),
+                  _buildDialogRow('ราคา', '${machine.price} บาท'),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.warning.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.info_outline_rounded,
+                          color: AppTheme.warning,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'หากไม่มาใช้งานภายใน 5 นาที คิวจะหลุดโดยอัตโนมัติ',
+                            style: GoogleFonts.prompt(
+                              fontSize: 11,
+                              color: AppTheme.warning,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -872,16 +1222,16 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen>
       await ref
           .read(bookingProvider)
           .createBooking(
-            machineId: widget.machine.id,
-            machineNumber: widget.machine.machineNumber,
+            machineId: machine.id,
+            machineNumber: machine.machineNumber,
             startTime: selectedDateTime,
             durationMinutes: durationMinutes,
           );
 
       if (mounted) {
-        // Force refresh providers so home screen updates immediately
         ref.invalidate(activeBookingsProvider);
         ref.invalidate(machineProvider);
+        ref.invalidate(machineQueueProvider(machine.id));
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -925,6 +1275,160 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen>
     }
   }
 
+  Widget _buildUpcomingQueue(String machineId) {
+    final queueAsync = ref.watch(machineQueueProvider(machineId));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.people_outline_rounded,
+              color: AppTheme.textSecondary,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'คิวรอใช้งาน',
+              style: GoogleFonts.prompt(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        queueAsync.when(
+          data: (queue) {
+            if (queue.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppTheme.neutral200),
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.event_note_rounded,
+                      color: AppTheme.neutral300,
+                      size: 32,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'ยังไม่มีคิวในขณะนี้',
+                      style: GoogleFonts.prompt(
+                        color: AppTheme.neutral400,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: queue.length,
+              itemBuilder: (context, index) {
+                final item = queue[index];
+                final booking = item['booking'] as Booking;
+                final userName = item['userName'] as String;
+                final isCurrent =
+                    booking.status == BookingStatus.inProgress ||
+                    booking.status == BookingStatus.checkedIn;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isCurrent
+                        ? _machineColor.withValues(alpha: 0.05)
+                        : AppTheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isCurrent
+                          ? _machineColor.withValues(alpha: 0.2)
+                          : AppTheme.neutral200,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: isCurrent
+                              ? _machineColor
+                              : AppTheme.neutral100,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            isCurrent ? '●' : '${index + 1}',
+                            style: GoogleFonts.prompt(
+                              color: isCurrent
+                                  ? Colors.white
+                                  : AppTheme.textSecondary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              userName,
+                              style: GoogleFonts.prompt(
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              isCurrent ? 'กำลังใช้งาน' : 'รอรับบริการ...',
+                              style: GoogleFonts.prompt(
+                                fontSize: 12,
+                                color: isCurrent
+                                    ? _machineColor
+                                    : AppTheme.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        DateFormat('HH:mm').format(booking.startTime.toLocal()),
+                        style: GoogleFonts.prompt(
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+          loading: () => const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(),
+            ),
+          ),
+          error: (err, stack) => Text('Error: $err'),
+        ),
+      ],
+    );
+  }
+
   Widget _buildDialogRow(String label, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -942,21 +1446,6 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen>
         ),
       ],
     );
-  }
-
-  IconData _getStatusIcon(MachineStatus status) {
-    switch (status) {
-      case MachineStatus.available:
-        return Icons.check_circle_rounded;
-      case MachineStatus.inUse:
-        return Icons.play_circle_rounded;
-      case MachineStatus.reserved:
-        return Icons.schedule_rounded;
-      case MachineStatus.maintenance:
-        return Icons.build_circle_rounded;
-      case MachineStatus.overdue:
-        return Icons.warning_rounded;
-    }
   }
 
   String _getStatusText(MachineStatus status) {

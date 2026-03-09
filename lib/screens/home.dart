@@ -164,11 +164,9 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
     final machineAsync = ref.watch(machineProvider);
     final activeBookingsAsync = ref.watch(activeBookingsProvider);
 
-    // Collect machine IDs that have active bookings right now
     final bookedMachineIds = <String>{};
     if (activeBookingsAsync.hasValue) {
       for (final b in activeBookingsAsync.value!) {
-        // Machine is busy if it has any active booking for today
         bookedMachineIds.add(b.machineId);
       }
     }
@@ -176,7 +174,6 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
     return SafeArea(
       child: CustomScrollView(
         slivers: [
-          // ── Header: WashQ + Notification ──
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -235,7 +232,6 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
             ),
           ),
 
-          // ── Dorm Location Selector ──
           SliverToBoxAdapter(
             child: userProfileAsync.when(
               data: (user) {
@@ -363,7 +359,6 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // Dots indicator
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: List.generate(
@@ -387,7 +382,6 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
             ),
           ),
 
-          // ── Category Section ──
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
@@ -456,7 +450,6 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
             ),
           ),
 
-          // ── Machine List Header ──
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
@@ -498,7 +491,6 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
             ),
           ),
 
-          // ── Machine Grid ──
           machineAsync.when(
             data: (machines) {
               final user = userProfileAsync.asData?.value;
@@ -602,7 +594,6 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
                 );
               }
 
-              // Sort: Available first, then by number
               final sortedMachines = [...filteredMachines];
               sortedMachines.sort((a, b) {
                 final aAvailable =
@@ -653,7 +644,6 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
             ),
           ),
 
-          // Bottom padding
           const SliverToBoxAdapter(child: SizedBox(height: 16)),
         ],
       ),
@@ -790,7 +780,6 @@ class _MachineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Machine is unavailable if DB status says so OR if there's an active booking
     final isAvailable = machine.status == MachineStatus.available && !isBooked;
     final statusColor = isAvailable ? AppTheme.success : AppTheme.error;
     final duration = machine.machineType == MachineType.washer ? '40' : '50';
@@ -820,7 +809,6 @@ class _MachineCard extends StatelessWidget {
           height: 140,
           child: Row(
             children: [
-              // Left: Machine image area
               Container(
                 width: 130,
                 decoration: BoxDecoration(
@@ -840,7 +828,6 @@ class _MachineCard extends StatelessWidget {
                         size: 80,
                       ),
                     ),
-                    // Machine number badge
                     Positioned(
                       top: 8,
                       left: 8,
@@ -867,7 +854,6 @@ class _MachineCard extends StatelessWidget {
                 ),
               ),
 
-              // Right: Details
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
@@ -877,7 +863,6 @@ class _MachineCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Title row with favorite-like icon
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -896,7 +881,6 @@ class _MachineCard extends StatelessWidget {
 
                       const SizedBox(height: 4),
 
-                      // Rating / badge row
                       Row(
                         children: [
                           if (showPopular) ...[
@@ -918,15 +902,8 @@ class _MachineCard extends StatelessWidget {
 
                       const SizedBox(height: 6),
 
-                      // Info row: floor, duration
                       Row(
                         children: [
-                          Icon(
-                            Icons.timer_outlined,
-                            size: 14,
-                            color: AppTheme.neutral400,
-                          ),
-                          const SizedBox(width: 3),
                           Text(
                             '$duration นาที',
                             style: GoogleFonts.prompt(
@@ -955,7 +932,6 @@ class _MachineCard extends StatelessWidget {
 
                       const Spacer(),
 
-                      // Status badge
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 14,
