@@ -7,6 +7,7 @@ import 'package:laundry_app/models/theme.dart';
 import 'package:laundry_app/providers/booking_provider.dart';
 import 'package:laundry_app/providers/machine_provider.dart';
 import 'package:laundry_app/screens/components/machine_illustration.dart';
+import 'package:laundry_app/screens/qr_scanner_screen.dart';
 import 'package:intl/intl.dart';
 
 final myBookingsProvider = StreamProvider.autoDispose<List<Booking>>((ref) {
@@ -632,6 +633,8 @@ class _BookingCard extends ConsumerWidget {
     );
     // Allow check-in from 5 minutes before start time
     return now.isAfter(bookingStart.subtract(const Duration(minutes: 5)));
+    // Allow check-in only from the exact start time
+    // return now.isAfter(bookingStart) || now.isAtSameMomentAs(bookingStart);
   }
 
   /// Check if booking has passed end time (for auto-complete hint)
@@ -875,155 +878,191 @@ class _BookingCard extends ConsumerWidget {
                               ],
                               const Spacer(),
 
-                              // ── Check-in button (pending + time arrived) ──
-                              if (canCheckIn)
-                                GestureDetector(
-                                  onTap: () => _showCheckInDialog(context, ref),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 5,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      gradient: const LinearGradient(
-                                        colors: [
-                                          AppTheme.primary,
-                                          Color(0xFF4DA8FF),
-                                        ],
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // ── Cancel button (pending only) ──
+                                  if (isPending)
+                                    GestureDetector(
+                                      onTap: () => _showCancelDialog(context, ref),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 5,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.error.withValues(
+                                            alpha: 0.08,
+                                          ),
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(
+                                            color: AppTheme.error.withValues(
+                                              alpha: 0.25,
+                                            ),
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.close_rounded,
+                                              size: 14,
+                                              color: AppTheme.error,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'ยกเลิก',
+                                              style: GoogleFonts.prompt(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppTheme.error,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                      borderRadius: BorderRadius.circular(20),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: AppTheme.primary.withValues(
-                                            alpha: 0.3,
-                                          ),
-                                          blurRadius: 6,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
                                     ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.play_circle_filled_rounded,
-                                          size: 14,
-                                          color: Colors.white,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'เริ่มซักผ้า',
-                                          style: GoogleFonts.prompt(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
 
-                              // ── Complete button (in progress) ──
-                              if (canComplete)
-                                GestureDetector(
-                                  onTap: () =>
-                                      _showCompleteDialog(context, ref),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 5,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: pastEndTime
-                                            ? [
-                                                AppTheme.success,
-                                                const Color(0xFF7DD9A0),
-                                              ]
-                                            : [
-                                                const Color(0xFF5B9CF6),
-                                                const Color(0xFF7DB8F8),
-                                              ],
-                                      ),
-                                      borderRadius: BorderRadius.circular(20),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color:
-                                              (pastEndTime
-                                                      ? AppTheme.success
-                                                      : const Color(0xFF5B9CF6))
-                                                  .withValues(alpha: 0.3),
-                                          blurRadius: 6,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          pastEndTime
-                                              ? Icons.check_circle_rounded
-                                              : Icons.stop_circle_rounded,
-                                          size: 14,
-                                          color: Colors.white,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          pastEndTime ? 'รับผ้า' : 'เสร็จสิ้น',
-                                          style: GoogleFonts.prompt(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
+                                  if (isPending && canCheckIn) const SizedBox(height: 8),
 
-                              // ── Cancel button (pending only, before check-in time) ──
-                              if (isPending && !canCheckIn)
-                                GestureDetector(
-                                  onTap: () => _showCancelDialog(context, ref),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 5,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.error.withValues(
-                                        alpha: 0.08,
-                                      ),
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(
-                                        color: AppTheme.error.withValues(
-                                          alpha: 0.25,
-                                        ),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.close_rounded,
-                                          size: 14,
-                                          color: AppTheme.error,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'ยกเลิก',
-                                          style: GoogleFonts.prompt(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: AppTheme.error,
+                                  // ── Check-in button (pending + time arrived) ──
+                                  if (canCheckIn)
+                                    GestureDetector(
+                                      onTap: () async {
+                                        // 1. Open Scanner
+                                        final scannedId = await Navigator.push<String>(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => QRScannerScreen(
+                                              machineId: booking.machineId,
+                                            ),
                                           ),
+                                        );
+                                        
+                                        // 2. Validate Result
+                                        if (!context.mounted) return;
+                                        if (scannedId != null) {
+                                          if (scannedId == booking.machineId) {
+                                            _showCheckInDialog(context, ref);
+                                          } else {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'รหัสเครื่องไม่ถูกต้อง (สแกนได้: $scannedId, ถูกต้องคือ: ${booking.machineId})',
+                                                  style: GoogleFonts.prompt(),
+                                                ),
+                                                backgroundColor: AppTheme.error,
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 5,
                                         ),
-                                      ],
+                                        decoration: BoxDecoration(
+                                          gradient: const LinearGradient(
+                                            colors: [
+                                              AppTheme.primary,
+                                              Color(0xFF4DA8FF),
+                                            ],
+                                          ),
+                                          borderRadius: BorderRadius.circular(20),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: AppTheme.primary.withValues(
+                                                alpha: 0.3,
+                                              ),
+                                              blurRadius: 6,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons.qr_code_scanner_rounded,
+                                              size: 14,
+                                              color: Colors.white,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'สแกน QR',
+                                              style: GoogleFonts.prompt(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ),
+
+                                  // ── Complete button (in progress) ──
+                                  if (canComplete)
+                                    GestureDetector(
+                                      onTap: () =>
+                                          _showCompleteDialog(context, ref),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 5,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: pastEndTime
+                                                ? [
+                                                    AppTheme.success,
+                                                    const Color(0xFF7DD9A0),
+                                                  ]
+                                                : [
+                                                    const Color(0xFF5B9CF6),
+                                                    const Color(0xFF7DB8F8),
+                                                  ],
+                                          ),
+                                          borderRadius: BorderRadius.circular(20),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color:
+                                                  (pastEndTime
+                                                          ? AppTheme.success
+                                                          : const Color(0xFF5B9CF6))
+                                                      .withValues(alpha: 0.3),
+                                              blurRadius: 6,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              pastEndTime
+                                                  ? Icons.check_circle_rounded
+                                                  : Icons.stop_circle_rounded,
+                                              size: 14,
+                                              color: Colors.white,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              pastEndTime ? 'รับผ้า' : 'เสร็จสิ้น',
+                                              style: GoogleFonts.prompt(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ],
                           ),
                         ],
