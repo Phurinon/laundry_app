@@ -149,7 +149,6 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen>
 
     final isPending = _currentBooking.status == BookingStatus.pending;
     final isInProgress = _currentBooking.status == BookingStatus.inProgress;
-    final isCompleted = _currentBooking.status == BookingStatus.completed;
 
     final canCheckIn = isPending && _isTimeToCheckIn();
     final canComplete =
@@ -333,8 +332,6 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen>
                             _currentBooking.status == BookingStatus.completed,
                             signalState.status,
                           ),
-                          const SizedBox(height: 16),
-                          _buildQueueStatus(),
                           const SizedBox(height: 32),
                           Text(
                             'วันและเวลาที่จอง',
@@ -431,11 +428,13 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen>
                               ],
                             ),
                           const SizedBox(height: 32),
-                          if (isInProgress || isCompleted) ...[
-                            _buildSimulationCard(signalState),
-                            const SizedBox(height: 16),
-                          ],
-                          const SizedBox(height: 24),
+                          _buildSimulationCard(signalState),
+                          const SizedBox(height: 32),
+                          _buildUpcomingQueue(
+                            _currentBooking.machineId,
+                            themeColor,
+                          ),
+                          const SizedBox(height: 120),
                         ],
                       ),
                     ),
@@ -548,7 +547,7 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen>
                       ),
                     ),
                   if (isPending) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     _buildSecondaryButton(
                       onTap: () => _handleCancel(),
                       label: 'ยกเลิกการจอง',
@@ -561,96 +560,6 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen>
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildQueueStatus() {
-    if (_currentBooking.status != BookingStatus.pending) {
-      return const SizedBox.shrink();
-    }
-
-    final queueAsync = ref.watch(
-      machineQueueProvider(_currentBooking.machineId),
-    );
-
-    return queueAsync.when(
-      data: (queue) {
-        final position = queue.indexWhere(
-          (item) => (item['booking'] as Booking).id == _currentBooking.id,
-        );
-
-        if (position == -1) return const SizedBox.shrink();
-
-        final ahead = queue.take(position).where((item) {
-          final b = item['booking'] as Booking;
-          return b.status == BookingStatus.pending;
-        }).length;
-
-        final isNext = ahead == 0;
-
-        return Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: isNext
-                ? AppTheme.success.withValues(alpha: 0.1)
-                : AppTheme.surface,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: isNext
-                  ? AppTheme.success.withValues(alpha: 0.3)
-                  : AppTheme.neutral200,
-            ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isNext ? 'ถึงคิวของคุณแล้ว!' : 'ลำดับคิวของคุณ',
-                      style: GoogleFonts.prompt(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                    Text(
-                      isNext
-                          ? 'กรุณาไปที่เครื่องเพื่อเริ่มใช้งาน'
-                          : 'รออีก $ahead คิวจะถึงตาคุณ',
-                      style: GoogleFonts.prompt(
-                        color: AppTheme.textSecondary,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (!isNext)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppTheme.neutral100,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'คิวที่ ${ahead + 1}',
-                    style: GoogleFonts.prompt(
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, _) => const SizedBox.shrink(),
     );
   }
 
@@ -806,36 +715,41 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: themeColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: themeColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.analytics_rounded,
+                        color: themeColor,
+                        size: 20,
+                      ),
                     ),
-                    child: Icon(
-                      Icons.analytics_rounded,
-                      color: themeColor,
-                      size: 20,
+                    const SizedBox(width: 20),
+                    Flexible(
+                      child: Text(
+                        'Real-time Sensor',
+                        style: GoogleFonts.prompt(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Real-time Sensor',
-                    style: GoogleFonts.prompt(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               if (signalState.status != MachineWorkStatus.idle)
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
+                    horizontal: 10,
+                    vertical: 5,
                   ),
                   decoration: BoxDecoration(
                     color: AppTheme.success.withValues(alpha: 0.1),
@@ -846,7 +760,7 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen>
                         ? 'เสร็จสิ้น'
                         : 'กำลังทำงาน',
                     style: GoogleFonts.prompt(
-                      fontSize: 10,
+                      fontSize: 11,
                       color: AppTheme.success,
                       fontWeight: FontWeight.bold,
                     ),
@@ -898,28 +812,232 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen>
         children: [
           Icon(icon, color: color, size: 20),
           const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: GoogleFonts.prompt(
-                  fontSize: 10,
-                  color: AppTheme.textSecondary,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.prompt(
+                    fontSize: 10,
+                    color: AppTheme.textSecondary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              Text(
-                value,
-                style: GoogleFonts.prompt(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.textPrimary,
+                Text(
+                  value,
+                  style: GoogleFonts.prompt(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildUpcomingQueue(String machineId, Color machineColor) {
+    final queueAsync = ref.watch(machineQueueProvider(machineId));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.people_outline_rounded,
+              color: AppTheme.textSecondary,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'คิวรอใช้งาน',
+              style: GoogleFonts.prompt(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        queueAsync.when(
+          data: (queue) {
+            if (queue.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppTheme.neutral200),
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.event_note_rounded,
+                      color: AppTheme.neutral300,
+                      size: 32,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'ยังไม่มีคิวในขณะนี้',
+                      style: GoogleFonts.prompt(
+                        color: AppTheme.neutral400,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return ListView.builder(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: queue.length,
+              itemBuilder: (context, index) {
+                final item = queue[index];
+                final booking = item['booking'] as Booking;
+                final userName = item['userName'] as String;
+                final isSelf = booking.id == _currentBooking.id;
+                final isCurrent =
+                    booking.status == BookingStatus.inProgress ||
+                    booking.status == BookingStatus.checkedIn;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isCurrent
+                        ? machineColor.withValues(alpha: 0.05)
+                        : (isSelf
+                              ? AppTheme.primary.withValues(alpha: 0.05)
+                              : AppTheme.surface),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isCurrent
+                          ? machineColor.withValues(alpha: 0.2)
+                          : (isSelf
+                                ? AppTheme.primary.withValues(alpha: 0.3)
+                                : AppTheme.neutral200),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: isCurrent
+                              ? machineColor
+                              : (isSelf
+                                    ? AppTheme.primary
+                                    : AppTheme.neutral100),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            isCurrent ? '●' : '${index + 1}',
+                            style: GoogleFonts.prompt(
+                              color: isCurrent || isSelf
+                                  ? Colors.white
+                                  : AppTheme.textSecondary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    userName,
+                                    style: GoogleFonts.prompt(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.textPrimary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (isSelf) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primary.withValues(
+                                        alpha: 0.1,
+                                      ),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      'คุณ',
+                                      style: GoogleFonts.prompt(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.primary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            Text(
+                              isCurrent
+                                  ? 'กำลังใช้งาน'
+                                  : (isSelf ? 'คิวของคุณ' : 'รอรับบริการ...'),
+                              style: GoogleFonts.prompt(
+                                fontSize: 12,
+                                color: isCurrent
+                                    ? machineColor
+                                    : (isSelf
+                                          ? AppTheme.primary
+                                          : AppTheme.textSecondary),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        DateFormat('HH:mm').format(booking.startTime.toLocal()),
+                        style: GoogleFonts.prompt(
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+          loading: () => const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(),
+            ),
+          ),
+          error: (err, stack) => Text('Error: $err'),
+        ),
+      ],
     );
   }
 
@@ -1040,9 +1158,10 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen>
         onPressed: _isProcessing ? null : onTap,
         style: TextButton.styleFrom(
           foregroundColor: color,
+          backgroundColor: color.withValues(alpha: 0.08),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: color.withValues(alpha: 0.2)),
+            side: BorderSide(color: color.withValues(alpha: 0.3), width: 1.5),
           ),
         ),
         child: Text(
@@ -1069,10 +1188,16 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen>
         try {
           await ref.read(bookingProvider).checkInBooking(_currentBooking.id);
 
+          final machines = ref.read(machineProvider).value ?? [];
+          final machine = machines.firstWhere(
+            (m) => m.id == _currentBooking.machineId,
+          );
+
           ref
               .read(machineSignalProvider.notifier)
               .startMockWashing(
                 machineId: _currentBooking.machineId,
+                machineType: machine.machineType,
                 bookingId: _currentBooking.id,
               );
 

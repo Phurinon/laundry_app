@@ -750,31 +750,37 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: _machineColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _machineColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.analytics_rounded,
+                        color: _machineColor,
+                        size: 20,
+                      ),
                     ),
-                    child: Icon(
-                      Icons.analytics_rounded,
-                      color: _machineColor,
-                      size: 20,
+                    const SizedBox(width: 12),
+                    Flexible(
+                      child: Text(
+                        'Real-time Sensor',
+                        style: GoogleFonts.prompt(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Real-time Sensor',
-                    style: GoogleFonts.prompt(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               if (signalState.status != MachineWorkStatus.idle)
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -842,25 +848,29 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen>
         children: [
           Icon(icon, color: color, size: 20),
           const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: GoogleFonts.prompt(
-                  fontSize: 10,
-                  color: AppTheme.textSecondary,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.prompt(
+                    fontSize: 10,
+                    color: AppTheme.textSecondary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              Text(
-                value,
-                style: GoogleFonts.prompt(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.textPrimary,
+                Text(
+                  value,
+                  style: GoogleFonts.prompt(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -893,6 +903,7 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen>
                     .read(machineSignalProvider.notifier)
                     .startMockWashing(
                       machineId: widget.machine.id,
+                      machineType: widget.machine.machineType,
                       bookingId: booking.id,
                     );
 
@@ -1229,6 +1240,7 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen>
           );
 
       if (mounted) {
+        ref.invalidate(myBookingsProvider);
         ref.invalidate(activeBookingsProvider);
         ref.invalidate(machineProvider);
         ref.invalidate(machineQueueProvider(machine.id));
@@ -1343,18 +1355,26 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen>
                     booking.status == BookingStatus.inProgress ||
                     booking.status == BookingStatus.checkedIn;
 
+                final currentUserId =
+                    Supabase.instance.client.auth.currentUser?.id;
+                final isSelf = booking.userId == currentUserId;
+
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: isCurrent
                         ? _machineColor.withValues(alpha: 0.05)
-                        : AppTheme.surface,
+                        : (isSelf
+                              ? AppTheme.primary.withValues(alpha: 0.05)
+                              : AppTheme.surface),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: isCurrent
                           ? _machineColor.withValues(alpha: 0.2)
-                          : AppTheme.neutral200,
+                          : (isSelf
+                                ? AppTheme.primary.withValues(alpha: 0.3)
+                                : AppTheme.neutral200),
                     ),
                   ),
                   child: Row(
@@ -1365,14 +1385,16 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen>
                         decoration: BoxDecoration(
                           color: isCurrent
                               ? _machineColor
-                              : AppTheme.neutral100,
+                              : (isSelf
+                                    ? AppTheme.primary
+                                    : AppTheme.neutral100),
                           shape: BoxShape.circle,
                         ),
                         child: Center(
                           child: Text(
                             isCurrent ? '●' : '${index + 1}',
                             style: GoogleFonts.prompt(
-                              color: isCurrent
+                              color: isCurrent || isSelf
                                   ? Colors.white
                                   : AppTheme.textSecondary,
                               fontWeight: FontWeight.bold,
@@ -1385,20 +1407,55 @@ class _MachineInfoScreenState extends ConsumerState<MachineInfoScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              userName,
-                              style: GoogleFonts.prompt(
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.textPrimary,
-                              ),
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    userName,
+                                    style: GoogleFonts.prompt(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.textPrimary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (isSelf) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.primary.withValues(
+                                        alpha: 0.1,
+                                      ),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      'คุณ',
+                                      style: GoogleFonts.prompt(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppTheme.primary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                             Text(
-                              isCurrent ? 'กำลังใช้งาน' : 'รอรับบริการ...',
+                              isCurrent
+                                  ? 'กำลังใช้งาน'
+                                  : (isSelf ? 'คิวของคุณ' : 'รอรับบริการ...'),
                               style: GoogleFonts.prompt(
                                 fontSize: 12,
                                 color: isCurrent
                                     ? _machineColor
-                                    : AppTheme.textSecondary,
+                                    : (isSelf
+                                          ? AppTheme.primary
+                                          : AppTheme.textSecondary),
                               ),
                             ),
                           ],

@@ -579,11 +579,11 @@ Color _statusColor(BookingStatus status) {
 String _statusText(BookingStatus status) {
   switch (status) {
     case BookingStatus.pending:
-      return 'รอใช้งาน';
+      return 'ถึงคิวของคุณแล้ว';
     case BookingStatus.checkedIn:
-      return 'เช็คอินแล้ว';
+      return 'คิวของคุณ (เช็คอินแล้ว)';
     case BookingStatus.inProgress:
-      return 'กำลังซัก';
+      return 'ผ้าคุณกำลังซักอยู่';
     case BookingStatus.completed:
       return 'เสร็จสิ้น';
     case BookingStatus.cancelled:
@@ -778,36 +778,40 @@ class _BookingCard extends ConsumerWidget {
 
                             const SizedBox(height: 6),
 
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.access_time_rounded,
-                                  size: 14,
-                                  color: AppTheme.neutral400,
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  timeStr,
-                                  style: GoogleFonts.prompt(
-                                    fontSize: 12,
-                                    color: AppTheme.textSecondary,
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.access_time_rounded,
+                                    size: 14,
+                                    color: AppTheme.neutral400,
                                   ),
-                                ),
-                                const SizedBox(width: 10),
-                                Icon(
-                                  Icons.circle,
-                                  size: 4,
-                                  color: AppTheme.neutral400,
-                                ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  '${booking.durationMinutes} นาที',
-                                  style: GoogleFonts.prompt(
-                                    fontSize: 12,
-                                    color: AppTheme.textSecondary,
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    timeStr,
+                                    style: GoogleFonts.prompt(
+                                      fontSize: 12,
+                                      color: AppTheme.textSecondary,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 10),
+                                  Icon(
+                                    Icons.circle,
+                                    size: 4,
+                                    color: AppTheme.neutral400,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    '${booking.durationMinutes} นาที',
+                                    style: GoogleFonts.prompt(
+                                      fontSize: 12,
+                                      color: AppTheme.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
 
                             const Spacer(),
@@ -1088,7 +1092,6 @@ class _BookingCard extends ConsumerWidget {
       ),
     );
   }
-
 
   void _showCompleteDialog(BuildContext context, WidgetRef ref) {
     showDialog(
