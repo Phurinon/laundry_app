@@ -31,7 +31,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
   void _handleScanResult(String code) {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
-    
+
     // Check if the scanned code corresponds to the machine ID
     // Note: in a real app, the QR code might contain a URL or JSON.
     // For this mock, we simply expect the machineId as a string.
@@ -133,7 +133,7 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                   Shadow(
                     color: Colors.black.withValues(alpha: 0.8),
                     blurRadius: 10,
-                  )
+                  ),
                 ],
               ),
             ),
@@ -147,19 +147,21 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: AppTheme.surface,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(30),
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.2),
                     blurRadius: 10,
                     offset: const Offset(0, -5),
-                  )
+                  ),
                 ],
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                   Row(
+                  Row(
                     children: [
                       const Icon(Icons.developer_mode, color: AppTheme.primary),
                       const SizedBox(width: 8),
@@ -191,7 +193,9 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                         icon: const Icon(Icons.copy, size: 16),
                         color: AppTheme.primary,
                         onPressed: () {
-                          Clipboard.setData(ClipboardData(text: widget.machineId));
+                          Clipboard.setData(
+                            ClipboardData(text: widget.machineId),
+                          );
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('คัดลอกรหัสเครื่องแล้ว'),
@@ -209,15 +213,22 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                         child: TextField(
                           controller: _mockInputController,
                           decoration: InputDecoration(
-                            hintText: 'ป้อนรหัสเครื่อง (เช่น ${widget.machineId})...',
-                            hintStyle: GoogleFonts.prompt(color: AppTheme.neutral400, fontSize: 13),
+                            hintText:
+                                'ป้อนรหัสเครื่อง (เช่น ${widget.machineId})...',
+                            hintStyle: GoogleFonts.prompt(
+                              color: AppTheme.neutral400,
+                              fontSize: 13,
+                            ),
                             filled: true,
                             fillColor: AppTheme.background,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide.none,
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
                           ),
                           style: GoogleFonts.prompt(),
                         ),
@@ -237,7 +248,10 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
                         ),
                         child: IconButton(
                           onPressed: _handleMockSubmit,
-                          icon: const Icon(Icons.check_rounded, color: Colors.white),
+                          icon: const Icon(
+                            Icons.check_rounded,
+                            color: Colors.white,
+                          ),
                           tooltip: 'ยืนยันรหัส',
                         ),
                       ),
@@ -247,9 +261,9 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
               ),
             ),
           ),
-          
+
           if (_isProcessing)
-             Container(
+            Container(
               color: Colors.black.withValues(alpha: 0.5),
               child: const Center(
                 child: CircularProgressIndicator(color: AppTheme.primary),

@@ -8,6 +8,7 @@ import 'package:laundry_app/providers/booking_provider.dart';
 import 'package:laundry_app/providers/machine_provider.dart';
 import 'package:laundry_app/screens/components/machine_illustration.dart';
 import 'package:laundry_app/screens/booking_detail.dart';
+import 'package:laundry_app/providers/auth_provider.dart';
 import 'package:intl/intl.dart';
 
 enum BookingFilter { all, active, completed, cancelled }
@@ -40,7 +41,10 @@ class _MyBookingsScreenState extends ConsumerState<MyBookingsScreen>
     _animController.forward();
 
     Future.microtask(() {
-      ref.read(bookingProvider).checkOverdueBookings();
+      final session = ref.read(authProvider).value;
+      if (session?.user.id != null) {
+        ref.read(bookingProvider).checkOverdueBookings(session!.user.id);
+      }
     });
   }
 

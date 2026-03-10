@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:laundry_app/models/booking.dart';
 import 'package:laundry_app/services/notification_service.dart';
+import 'package:laundry_app/providers/auth_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 
@@ -13,7 +14,10 @@ final activeBookingsProvider = StreamProvider<List<Booking>>((ref) {
 });
 
 final myBookingsProvider = StreamProvider<List<Booking>>((ref) {
-  return ref.watch(bookingProvider).getMyBookings();
+  final session = ref.watch(authProvider).value;
+  final userId = session?.user.id;
+  if (userId == null) return Stream.value([]);
+  return ref.watch(bookingProvider).getMyBookings(userId);
 });
 
 final machineQueueProvider =
@@ -169,10 +173,7 @@ class BookingService {
         );
   }
 
-  Stream<List<Booking>> getMyBookings() {
-    final userId = _supabase.auth.currentUser?.id;
-    if (userId == null) return Stream.value([]);
-
+  Stream<List<Booking>> getMyBookings(String userId) {
     return _supabase
         .from('bookings')
         .stream(primaryKey: ['id'])
@@ -181,10 +182,7 @@ class BookingService {
         .map((data) => data.map((json) => Booking.fromJson(json)).toList());
   }
 
-  Future<void> checkOverdueBookings() async {
-    final userId = _supabase.auth.currentUser?.id;
-    if (userId == null) return;
-
+  Future<void> checkOverdueBookings(String userId) async {
     final nowUtc = DateTime.now().toUtc();
 
     final pendingOnes = await _supabase
